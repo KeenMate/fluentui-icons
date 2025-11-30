@@ -75,6 +75,9 @@ RUN groupadd -r fluentui && useradd -r -g fluentui fluentui
 # Copy the release from builder
 COPY --from=builder --chown=fluentui:fluentui /app/_build/prod/rel/fluentui_icons ./
 
+# Ensure scripts are executable
+RUN chmod +x /app/bin/*
+
 # Switch to non-root user
 USER fluentui
 
