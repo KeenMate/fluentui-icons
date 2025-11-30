@@ -30,15 +30,15 @@ COPY config config
 RUN mix esbuild.install
 RUN mix tailwind.install
 
+# Copy source code BEFORE assets.deploy so Tailwind can scan for classes
+COPY lib lib
+
 # Copy assets
 COPY assets assets
 COPY priv priv
 
-# Compile assets
+# Compile assets (Tailwind needs lib/*.ex files to find CSS classes)
 RUN mix assets.deploy
-
-# Copy source code
-COPY lib lib
 
 # Copy release files
 COPY rel rel
