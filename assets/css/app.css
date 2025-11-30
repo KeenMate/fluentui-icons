@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* View mode toggle - prevents flash on page load */
+/* Grid mode: show grid, hide list */
+[data-view-mode="grid"] .view-list { display: none !important; }
+
+/* List mode: show list, hide grid */
+[data-view-mode="list"] .view-grid { display: none !important; }
+
+/* View toggle button styles - active state based on data-view-mode */
+.btn-grid, .btn-list {
+  color: #4b5563; /* text-gray-600 */
+}
+.btn-grid:hover, .btn-list:hover {
+  color: #111827; /* text-gray-900 */
+}
+
+/* Active button styling */
+[data-view-mode="grid"] .btn-grid,
+[data-view-mode="list"] .btn-list {
+  background-color: white;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  color: #111827; /* text-gray-900 */
+}

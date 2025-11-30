@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Elixir/Phoenix
+_build
+deps
+*.ez
+*.beam
+/priv/static/assets/
+/priv/static/cache_manifest.json
+
+# Node
+node_modules/
+/assets/node_modules/
+
+# Generated on crash by the VM
+erl_crash.dump
+
+# Test
+/cover/
+/test/
+
+# Database
+*.db
+*.sqlite3
+
+# Env files
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker/
+
+# Documentation
+/doc/
+README*

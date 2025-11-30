@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - PHX_HOST=${PHX_HOST:-fluentui-icons.keenmate.dev}
+      - PORT=4000
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOSTNAME=${DB_HOSTNAME}
+      - DB_DATABASE=${DB_DATABASE:-fluentui_icons}
+    restart: unless-stopped
