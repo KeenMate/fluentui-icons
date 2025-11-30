@@ -10,7 +10,6 @@ defmodule FluentuiIcons.Synonyms.Seeder do
   alias FluentuiIcons.Repo
   alias FluentuiIcons.Icons.IconSynonym
 
-  @synonyms_file "priv/synonyms.json"
   @styles ~w(regular filled color light)
 
   @doc """
@@ -20,7 +19,7 @@ defmodule FluentuiIcons.Synonyms.Seeder do
   Does nothing if the file doesn't exist.
   """
   def seed do
-    case File.read(@synonyms_file) do
+    case File.read(synonyms_file()) do
       {:ok, content} ->
         case Jason.decode(content) do
           {:ok, synonyms_map} ->
@@ -69,5 +68,12 @@ defmodule FluentuiIcons.Synonyms.Seeder do
         Repo.insert_all(IconSynonym, entries)
       end
     end)
+  end
+
+  # Get the correct path to synonyms.json in any environment (dev or release)
+  defp synonyms_file do
+    :fluentui_icons
+    |> :code.priv_dir()
+    |> Path.join("synonyms.json")
   end
 end
