@@ -7,6 +7,9 @@ defmodule FluentuiIcons.Application do
 
   @impl true
   def start(_type, _args) do
+    # Run migrations on startup in production
+    migrate()
+
     children = [
       # Start the Ecto repository
       FluentuiIcons.Repo,
@@ -26,6 +29,15 @@ defmodule FluentuiIcons.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: FluentuiIcons.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp migrate do
+    # Only auto-migrate in production releases
+    if Application.get_env(:fluentui_icons, :auto_migrate, false) do
+      require Logger
+      Logger.info("Running database migrations...")
+      FluentuiIcons.Release.migrate()
+    end
   end
 
   # Sync icons from GitHub if the database is empty, then seed synonyms

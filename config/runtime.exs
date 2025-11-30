@@ -13,6 +13,9 @@ if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
 end
 
 if config_env() == :prod do
+  # Enable auto-migration on startup (can be disabled via env var)
+  config :fluentui_icons, auto_migrate: System.get_env("AUTO_MIGRATE", "true") == "true"
+
   # Database configuration from individual env vars (preferred) or DATABASE_URL
   db_config =
     if database_url = System.get_env("DATABASE_URL") do
