@@ -1,5 +1,8 @@
 import Config
 
+# Local icon storage for development
+config :fluentui_icons, icons_path: Path.expand("../.icons", __DIR__)
+
 # Configure your database - uses environment variables with defaults for local dev
 config :fluentui_icons, FluentuiIcons.Repo,
   username: System.get_env("DB_USERNAME") || "fluentui_icons",
@@ -72,3 +75,8 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Import local config if it exists (for user-specific overrides)
+if File.exists?(Path.expand(".local.exs", __DIR__)) do
+  import_config ".local.exs"
+end

@@ -4,7 +4,7 @@ defmodule FluentuiIcons.Sync.Worker do
   """
 
   require Logger
-  alias FluentuiIcons.{Repo, Icons.Icon, Sync.Parser}
+  alias FluentuiIcons.{Repo, Icons.Icon, Sync.Parser, Sync.SvgDownloader, Sync.SyncRun}
   import Ecto.Query
 
   @base_url "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main"
@@ -15,9 +15,16 @@ defmodule FluentuiIcons.Sync.Worker do
 
   This fetches all 4 markdown files (regular, filled, color, light) and
   updates the database with the parsed icons.
+
+  ## Options
+    * `:download_svgs` - Also download SVG files after syncing (default: true)
   """
-  def sync_all do
+  def sync_all(opts \\ []) do
+    download_svgs = Keyword.get(opts, :download_svgs, true)
     Logger.info("Starting FluentUI icons sync...")
+
+    # Start tracking the sync run
+    {:ok, sync_run} = SyncRun.start("icon_sync")
 
     results =
       Enum.map(@styles, fn style ->
@@ -35,6 +42,20 @@ defmodule FluentuiIcons.Sync.Worker do
     successes = Enum.count(results, &match?({:ok, _, _}, &1))
     total = results |> Enum.filter(&match?({:ok, _, _}, &1)) |> Enum.map(&elem(&1, 2)) |> Enum.sum()
     Logger.info("Sync complete: #{successes}/#{length(@styles)} styles succeeded (#{total} total icons)")
+
+    # Record sync completion
+    if successes > 0 do
+      SyncRun.complete(sync_run, %{icons_synced: total})
+    else
+      errors = results |> Enum.filter(&match?({:error, _, _}, &1)) |> Enum.map(&elem(&1, 2)) |> Enum.join(", ")
+      SyncRun.fail(sync_run, errors)
+    end
+
+    # Download SVGs after successful sync (using ZIP method for speed)
+    if download_svgs and successes > 0 do
+      Logger.info("Starting SVG download from ZIP...")
+      SvgDownloader.download_from_zip()
+    end
 
     results
   end

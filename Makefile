@@ -62,26 +62,13 @@ docker-build: ## Build Docker image
 
 docker-run: ## Run Docker container
 	@echo "Starting Docker container on port $(DOCKER_PORT)"
-	@if [ $$(docker ps -q -f name=$(DOCKER_CONTAINER_NAME)) ]; then \
-		echo "Container is already running at http://localhost:$(DOCKER_PORT)"; \
-	elif [ $$(docker ps -aq -f name=$(DOCKER_CONTAINER_NAME)) ]; then \
-		echo "Starting existing container"; \
-		docker start $(DOCKER_CONTAINER_NAME); \
-		echo "Application is running at: http://localhost:$(DOCKER_PORT)"; \
-	else \
-		echo "Creating and starting new container"; \
-		docker compose up -d; \
-		echo "Application is running at: http://localhost:$(DOCKER_PORT)"; \
-	fi
+	docker compose up -d
+	@echo "Application is running at: http://localhost:$(DOCKER_PORT)"
 
 docker-stop: ## Stop Docker container
 	@echo "Stopping Docker container"
-	@if [ $$(docker ps -q -f name=$(DOCKER_CONTAINER_NAME)) ]; then \
-		docker compose down; \
-		echo "Container stopped successfully"; \
-	else \
-		echo "Container is not running"; \
-	fi
+	docker compose down
+	@echo "Container stopped"
 
 docker-restart: docker-stop docker-run ## Restart Docker container
 
@@ -90,14 +77,9 @@ docker-logs: ## Show Docker container logs
 
 docker-clean: docker-stop ## Remove Docker container and image
 	@echo "Cleaning up Docker resources"
-	@if [ $$(docker ps -aq -f name=$(DOCKER_CONTAINER_NAME)) ]; then \
-		docker rm $(DOCKER_CONTAINER_NAME); \
-		echo "Container removed"; \
-	fi
-	@if [ $$(docker images -q $(DOCKER_IMAGE_NAME):$(DOCKER_TAG)) ]; then \
-		docker rmi $(DOCKER_IMAGE_NAME):$(DOCKER_TAG); \
-		echo "Image removed"; \
-	fi
+	-docker rm $(DOCKER_CONTAINER_NAME)
+	-docker rmi $(DOCKER_IMAGE_NAME):$(DOCKER_TAG)
+	@echo "Cleanup complete"
 
 docker-deploy: docker-build docker-run ## Build and run Docker container
 

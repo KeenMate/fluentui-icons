@@ -7,6 +7,12 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+# Icons storage path - set ICONS_PATH for local file serving
+# When nil, icons are served from GitHub
+if icons_path = System.get_env("ICONS_PATH") do
+  config :fluentui_icons, :icons_path, icons_path
+end
+
 # Start the phoenix server if environment is set and running in a release
 if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
   config :fluentui_icons, FluentuiIconsWeb.Endpoint, server: true

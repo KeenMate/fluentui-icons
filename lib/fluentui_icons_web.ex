@@ -22,7 +22,7 @@ defmodule FluentuiIconsWeb do
       use Phoenix.Controller, namespace: FluentuiIconsWeb
 
       import Plug.Conn
-      import FluentuiIconsWeb.Gettext
+      use Gettext, backend: FluentuiIconsWeb.Gettext
       alias FluentuiIconsWeb.Router.Helpers, as: Routes
     end
   end
@@ -80,7 +80,7 @@ defmodule FluentuiIconsWeb do
   def channel do
     quote do
       use Phoenix.Channel
-      import FluentuiIconsWeb.Gettext
+      use Gettext, backend: FluentuiIconsWeb.Gettext
     end
   end
 
@@ -99,7 +99,7 @@ defmodule FluentuiIconsWeb do
       import Phoenix.View
 
       import FluentuiIconsWeb.ErrorHelpers
-      import FluentuiIconsWeb.Gettext
+      use Gettext, backend: FluentuiIconsWeb.Gettext
       alias FluentuiIconsWeb.Router.Helpers, as: Routes
     end
   end

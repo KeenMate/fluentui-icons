@@ -52,13 +52,14 @@ RUN mix release
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install runtime dependencies (Erlang + system libs)
+# Install runtime dependencies (Erlang + system libs + 7zip for icon downloads)
 RUN apt-get update -y && apt-get install -y \
     libstdc++6 \
     openssl \
     libncurses5 \
     locales \
     ca-certificates \
+    p7zip-full \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # Set locale
@@ -74,6 +75,9 @@ RUN groupadd -r fluentui && useradd -r -g fluentui fluentui
 
 # Copy the release from builder
 COPY --from=builder --chown=fluentui:fluentui /app/_build/prod/rel/fluentui_icons ./
+
+# Create icons directory with proper permissions
+RUN mkdir -p /app/icons && chown fluentui:fluentui /app/icons
 
 # Ensure scripts are executable
 RUN chmod +x /app/bin/*

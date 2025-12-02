@@ -5,7 +5,7 @@ defmodule FluentuiIcons.Icons do
 
   import Ecto.Query, warn: false
   alias FluentuiIcons.Repo
-  alias FluentuiIcons.Icons.Icon
+  alias FluentuiIcons.Icons.{Icon, IconMetric, IconMetricsCube}
 
   @doc """
   Search for icons by name with optional filters.
@@ -174,4 +174,188 @@ defmodule FluentuiIcons.Icons do
     |> offset(^offset)
     |> Repo.all()
   end
+
+  # ---- Metrics Tracking ----
+
+  @doc """
+  Track a copy or download action for an icon.
+
+  ## Examples
+
+      iex> Icons.track_action(icon_id, "copy", platform: "svelte", size: 24)
+      {:ok, %IconMetric{}}
+  """
+  def track_action(icon_id, action, opts \\ []) do
+    %IconMetric{}
+    |> IconMetric.changeset(%{
+      icon_id: icon_id,
+      action: action,
+      size: opts[:size],
+      platform: opts[:platform]
+    })
+    |> Repo.insert()
+  end
+
+  @doc """
+  Get the most popular icons by copy/download count.
+
+  ## Options
+    * `:action` - Filter by "copy" or "download" (default: both)
+    * `:limit` - Maximum results (default: 20)
+    * `:since` - DateTime to filter from (default: all time)
+  """
+  def popular_icons(opts \\ []) do
+    action = opts[:action]
+    limit = opts[:limit] || 20
+    since = opts[:since]
+
+    query =
+      from m in IconMetric,
+        join: i in Icon, on: m.icon_id == i.id,
+        group_by: [i.id, i.name, i.style],
+        select: %{
+          icon_id: i.id,
+          name: i.name,
+          style: i.style,
+          count: count(m.id)
+        },
+        order_by: [desc: count(m.id)],
+        limit: ^limit
+
+    query
+    |> maybe_filter_action(action)
+    |> maybe_filter_since(since)
+    |> Repo.all()
+  end
+
+  defp maybe_filter_action(query, nil), do: query
+  defp maybe_filter_action(query, action) do
+    where(query, [m], m.action == ^action)
+  end
+
+  defp maybe_filter_since(query, nil), do: query
+  defp maybe_filter_since(query, since) do
+    where(query, [m], m.inserted_at >= ^since)
+  end
+
+  @doc """
+  Get metrics summary for a specific icon.
+  """
+  def icon_metrics(icon_id) do
+    from(m in IconMetric,
+      where: m.icon_id == ^icon_id,
+      group_by: m.action,
+      select: {m.action, count(m.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  # ---- Metrics Cube (Pre-aggregated) ----
+
+  @doc """
+  Refresh the metrics cube with current aggregations.
+  Run this nightly via scheduler.
+  """
+  def refresh_metrics_cube do
+    require Logger
+    Logger.info("Refreshing metrics cube...")
+
+    now = DateTime.utc_now()
+    seven_days_ago = DateTime.add(now, -7, :day)
+    thirty_days_ago = DateTime.add(now, -30, :day)
+
+    Repo.transaction(fn ->
+      # Clear existing cube data
+      Repo.delete_all(IconMetricsCube)
+
+      # Compute and insert for each period
+      for {period, since} <- [{"7d", seven_days_ago}, {"30d", thirty_days_ago}, {"all", nil}] do
+        aggregations = compute_aggregations(since)
+        count = length(aggregations)
+
+        aggregations
+        |> Enum.map(&Map.put(&1, :period, period))
+        |> Enum.chunk_every(500)
+        |> Enum.each(&Repo.insert_all(IconMetricsCube, &1))
+
+        Logger.info("Inserted #{count} cube entries for period #{period}")
+      end
+    end)
+
+    Logger.info("Metrics cube refresh complete")
+    :ok
+  end
+
+  defp compute_aggregations(nil) do
+    # All time
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    from(m in IconMetric,
+      group_by: [m.icon_id, m.action],
+      select: %{
+        icon_id: m.icon_id,
+        action: m.action,
+        count: count(m.id)
+      }
+    )
+    |> Repo.all()
+    |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
+  end
+
+  defp compute_aggregations(since) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    from(m in IconMetric,
+      where: m.inserted_at >= ^since,
+      group_by: [m.icon_id, m.action],
+      select: %{
+        icon_id: m.icon_id,
+        action: m.action,
+        count: count(m.id)
+      }
+    )
+    |> Repo.all()
+    |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
+  end
+
+  @doc """
+  Get popular icons from the cube (fast).
+
+  ## Options
+    * `:period` - Time period: "7d", "30d", or "all" (default: "all")
+    * `:action` - Filter by "copy" or "download" (default: both)
+    * `:limit` - Maximum results (default: 20)
+
+  ## Examples
+
+      iex> Icons.popular_icons_from_cube(period: "7d", action: "download", limit: 10)
+      [%{icon_id: 1, name: "Add", style: "regular", count: 150, action: "download"}, ...]
+  """
+  def popular_icons_from_cube(opts \\ []) do
+    period = opts[:period] || "all"
+    action = opts[:action]
+    limit = opts[:limit] || 20
+
+    query =
+      from c in IconMetricsCube,
+        join: i in Icon, on: c.icon_id == i.id,
+        where: c.period == ^period,
+        order_by: [desc: c.count],
+        limit: ^limit,
+        select: %{
+          icon_id: i.id,
+          name: i.name,
+          style: i.style,
+          count: c.count,
+          action: c.action
+        }
+
+    query
+    |> maybe_filter_cube_action(action)
+    |> Repo.all()
+  end
+
+  defp maybe_filter_cube_action(query, nil), do: query
+  defp maybe_filter_cube_action(query, action), do: where(query, [c], c.action == ^action)
 end

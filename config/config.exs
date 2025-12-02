@@ -8,7 +8,9 @@
 import Config
 
 config :fluentui_icons,
-  ecto_repos: [FluentuiIcons.Repo]
+  ecto_repos: [FluentuiIcons.Repo],
+  # Icons storage path - nil means use GitHub fallback, set ICONS_PATH env var for local storage
+  icons_path: nil
 
 # Configures the endpoint
 config :fluentui_icons, FluentuiIconsWeb.Endpoint,
@@ -54,7 +56,8 @@ config :tailwind,
 # Configure Quantum scheduler
 config :fluentui_icons, FluentuiIcons.Scheduler,
   jobs: [
-    {"0 3 * * *", {FluentuiIcons.Sync.Worker, :sync_all, []}}
+    {"0 3 * * *", {FluentuiIcons.Sync.Worker, :sync_all, []}},
+    {"0 4 * * *", {FluentuiIcons.Icons, :refresh_metrics_cube, []}}
   ]
 
 # Configures Elixir's Logger

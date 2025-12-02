@@ -62,8 +62,10 @@ defmodule FluentuiIcons.Sync.Parser do
     ~r/`([^`]+)`/
     |> Regex.scan(cell)
     |> Enum.reduce(%{}, fn [_, id], acc ->
-      # Extract size number from identifier (e.g., "20" from "add20Regular")
-      case Regex.run(~r/(\d+)/, id) do
+      # Extract size number from identifier (e.g., "20" from "add20Regular" or "musicNote120Filled")
+      # FluentUI sizes are always 2 digits (10, 12, 16, 20, 24, 28, 32, 40, 48)
+      # Match 2 digits immediately before the style suffix
+      case Regex.run(~r/(\d{2})(?:Regular|Filled|Color|Light)$/i, id) do
         [_, size] -> Map.put(acc, size, id)
         _ -> acc
       end

@@ -32,3 +32,9 @@ fluentui_icons-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Local config overrides
+/config/.local.exs
+
+# Downloaded icons cache
+/.icons/
+

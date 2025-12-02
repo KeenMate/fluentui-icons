@@ -40,20 +40,35 @@ defmodule FluentuiIcons.Application do
     end
   end
 
-  # Sync icons from GitHub if the database is empty, then seed synonyms
+  # Sync icons from GitHub if either DB or files are missing
+  # DB and files are treated as one atomic state
   defp maybe_initial_sync do
+    require Logger
+
+    # Log available extraction tools
+    FluentuiIcons.Sync.SvgDownloader.log_extraction_tools()
+
     # Small delay to ensure database is ready
     Process.sleep(2000)
 
-    case FluentuiIcons.Icons.count() do
-      0 ->
-        require Logger
-        Logger.info("Database empty, starting initial icon sync from GitHub...")
+    db_empty = FluentuiIcons.Icons.count() == 0
+    files_empty = not FluentuiIcons.Sync.SvgDownloader.icons_downloaded?()
+
+    cond do
+      db_empty and files_empty ->
+        Logger.info("DB and files empty, starting full sync...")
         FluentuiIcons.Sync.Worker.sync_all()
 
-      count ->
-        require Logger
-        Logger.info("Found #{count} icons in database, skipping initial sync")
+      db_empty ->
+        Logger.info("DB empty (files present), starting full sync...")
+        FluentuiIcons.Sync.Worker.sync_all()
+
+      files_empty ->
+        Logger.info("Files empty (DB present), starting full sync...")
+        FluentuiIcons.Sync.Worker.sync_all()
+
+      true ->
+        Logger.info("DB and files present, skipping initial sync")
     end
 
     # Always seed synonyms from JSON file

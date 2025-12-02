@@ -11,4 +11,10 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOSTNAME=${DB_HOSTNAME}
       - DB_DATABASE=${DB_DATABASE:-fluentui_icons}
+      - ICONS_PATH=/app/icons
+    volumes:
+      - icons_data:/app/icons
     restart: unless-stopped
+
+volumes:
+  icons_data:

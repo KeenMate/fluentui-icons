@@ -3,6 +3,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
 
   alias FluentuiIcons.Icons
   alias FluentuiIcons.Icons.Icon
+  alias FluentuiIcons.Sync.SyncRun
   alias Phoenix.LiveView.JS
 
   @per_page 30
@@ -15,14 +16,15 @@ defmodule FluentuiIconsWeb.IconSearchLive do
     view_mode = connect_params["view_mode"] || "grid"
     platform_prefs = connect_params["platform_prefs"] || %{}
     platform_prefs = atomize_keys(platform_prefs)
-    default_prefs = %{ios: true, android: true, react: true, svelte: true}
+    default_prefs = %{ios: true, android: true, react: true, svelte: true, filename: true}
     platform_prefs = Map.merge(default_prefs, platform_prefs)
 
     {:ok,
      socket
      |> assign(icon_count: Icons.count())
      |> assign(platform_prefs: platform_prefs)
-     |> assign(view_mode: view_mode)}
+     |> assign(view_mode: view_mode)
+     |> assign(last_sync_at: SyncRun.last_sync_at())}
   end
 
   @impl true
@@ -106,7 +108,9 @@ defmodule FluentuiIconsWeb.IconSearchLive do
 
   def handle_event("select_icon", %{"id" => id}, socket) do
     icon = Enum.find(socket.assigns.icons, &(to_string(&1.id) == id))
-    {:noreply, assign(socket, selected_icon: icon)}
+    # Fetch metrics for this icon (from raw table, fast enough for single icon)
+    metrics = if icon, do: Icons.icon_metrics(icon.id), else: %{}
+    {:noreply, assign(socket, selected_icon: icon, icon_metrics: metrics)}
   end
 
   def handle_event("close_modal", _params, socket) do
@@ -131,6 +135,25 @@ defmodule FluentuiIconsWeb.IconSearchLive do
       |> assign(view_mode: mode)
       |> push_event("save_view_mode", %{mode: mode})
 
+    {:noreply, socket}
+  end
+
+  def handle_event("track_download", %{"icon-id" => icon_id, "size" => size}, socket) do
+    # Track download asynchronously (don't block the UI)
+    Task.start(fn ->
+      Icons.track_action(String.to_integer(icon_id), "download", size: String.to_integer(size))
+    end)
+    {:noreply, socket}
+  end
+
+  def handle_event("track_copy", %{"icon-id" => icon_id, "platform" => platform} = params, socket) do
+    # Track copy asynchronously
+    size = params["size"]
+    Task.start(fn ->
+      opts = [platform: platform]
+      opts = if size, do: [{:size, String.to_integer(size)} | opts], else: opts
+      Icons.track_action(String.to_integer(icon_id), "copy", opts)
+    end)
     {:noreply, socket}
   end
 
@@ -345,11 +368,13 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         </div>
 
         <!-- Icon Display (Grid or List) - Both rendered, CSS controls visibility -->
-        <div class="view-grid">
-          <.icon_grid icons={@icons} selected_styles={@selected_styles} selected_sizes={@selected_sizes} />
-        </div>
-        <div class="view-list">
-          <.icon_list icons={@icons} />
+        <div id="icon-display" phx-hook="IconColorFilter">
+          <div class="view-grid">
+            <.icon_grid icons={@icons} selected_styles={@selected_styles} selected_sizes={@selected_sizes} />
+          </div>
+          <div class="view-list">
+            <.icon_list icons={@icons} />
+          </div>
         </div>
 
         <!-- Bottom Pager -->
@@ -382,14 +407,23 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         </div>
 
         <!-- Footer -->
-        <footer class="mt-12 py-6 border-t border-gray-200 text-center text-sm text-gray-500">
-          Made by <a href="https://keenmate.com" rel="noreferrer" referrerpolicy="origin" class="text-blue-600 hover:underline">Keenmate</a>
+        <footer class="mt-12 py-6 border-t border-gray-200 text-sm text-gray-500">
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>
+              Made by <a href="https://keenmate.com" rel="noreferrer" referrerpolicy="origin" class="text-blue-600 hover:underline">Keenmate</a>
+            </div>
+            <%= if @last_sync_at do %>
+              <div class="text-xs text-gray-400">
+                Last synced: <%= format_sync_time(@last_sync_at) %>
+              </div>
+            <% end %>
+          </div>
         </footer>
       </div>
 
       <!-- Icon Detail Modal -->
       <%= if @selected_icon do %>
-        <.icon_modal icon={@selected_icon} platform_prefs={@platform_prefs} />
+        <.icon_modal icon={@selected_icon} platform_prefs={@platform_prefs} metrics={@icon_metrics} />
       <% end %>
     </div>
     """
@@ -419,23 +453,67 @@ defmodule FluentuiIconsWeb.IconSearchLive do
             <div class="text-center mb-6">
               <h2 class="text-2xl font-bold text-gray-900" id="modal-title"><%= @icon.name %></h2>
               <span class="inline-block mt-1 px-2 py-0.5 rounded text-sm bg-gray-100 text-gray-600 capitalize"><%= @icon.style %></span>
+
+              <!-- Stats -->
+              <% copies = Map.get(@metrics, "copy", 0) %>
+              <% downloads = Map.get(@metrics, "download", 0) %>
+              <% total = copies + downloads %>
+              <%= if total > 0 do %>
+                <div class="flex justify-center gap-3 mt-3">
+                  <div class="px-3 py-1.5 bg-blue-50 rounded-lg text-center">
+                    <div class="text-lg font-semibold text-blue-600"><%= format_number(copies) %></div>
+                    <div class="text-xs text-blue-500">copies</div>
+                  </div>
+                  <div class="px-3 py-1.5 bg-green-50 rounded-lg text-center">
+                    <div class="text-lg font-semibold text-green-600"><%= format_number(downloads) %></div>
+                    <div class="text-xs text-green-500">downloads</div>
+                  </div>
+                  <div class="px-3 py-1.5 bg-gray-100 rounded-lg text-center">
+                    <div class="text-lg font-semibold text-gray-700"><%= format_number(total) %></div>
+                    <div class="text-xs text-gray-500">total</div>
+                  </div>
+                </div>
+              <% end %>
             </div>
 
-            <!-- Icon Sizes Preview -->
+            <!-- Color Picker -->
+            <div class="mb-4 flex items-center gap-3" id={"color-picker-#{@icon.id}"} phx-hook="ColorPicker"
+                 data-update-trigger={:erlang.phash2(@platform_prefs)}>
+              <label class="text-sm font-medium text-gray-700">Preview Color:</label>
+              <input type="color" value="#212121"
+                     class="color-input w-10 h-10 rounded cursor-pointer border border-gray-300" />
+              <input type="text" value="#212121"
+                     class="color-text w-24 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     maxlength="7" placeholder="#000000" />
+            </div>
+
+            <!-- Icon Sizes Preview with Download -->
             <div class="mb-6">
               <h3 class="text-sm font-medium text-gray-700 mb-3">Available Sizes</h3>
-              <div class="flex flex-wrap gap-4 justify-center items-end">
+              <div class="flex flex-wrap gap-4 justify-center items-end"
+                   id={"icon-preview-#{@icon.id}"}
+                   phx-hook="InlineSvg"
+                   data-color="#212121"
+                   data-urls={Jason.encode!(Enum.map(@icon.sizes, &Icon.svg_url(@icon, &1)))}>
                 <%= for size <- @icon.sizes do %>
                   <div class="flex flex-col items-center">
-                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200" style={"width: #{min(size + 24, 96)}px; height: #{min(size + 24, 96)}px; display: flex; align-items: center; justify-content: center;"}>
-                      <img
-                        src={Icon.svg_url(@icon, size)}
-                        alt={"#{@icon.name} #{size}px"}
-                        style={"width: #{size}px; height: #{size}px;"}
-                        loading="lazy"
-                      />
+                    <div class="svg-container bg-gray-50 rounded-lg p-3 border border-gray-200 flex items-center justify-center"
+                         data-size={size}
+                         style={"width: #{min(size + 24, 96)}px; height: #{min(size + 24, 96)}px;"}>
+                      <!-- SVG loaded by JavaScript -->
                     </div>
                     <span class="text-xs text-gray-500 mt-1"><%= size %>px</span>
+                    <a href={Icon.svg_url(@icon, size)}
+                       download={Icon.svg_filename(@icon, size)}
+                       phx-click="track_download"
+                       phx-value-icon-id={@icon.id}
+                       phx-value-size={size}
+                       class="mt-1 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download
+                    </a>
                   </div>
                 <% end %>
               </div>
@@ -488,6 +566,16 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
                   <span class="text-sm text-gray-600">Svelte</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={@platform_prefs.filename}
+                    phx-click="toggle_platform"
+                    phx-value-platform="filename"
+                    class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span class="text-sm text-gray-600">Filename</span>
                 </label>
               </div>
 
@@ -558,14 +646,21 @@ defmodule FluentuiIconsWeb.IconSearchLive do
 
               <!-- Svelte -->
               <%= if @platform_prefs.svelte do %>
-                <div class="bg-gray-50 rounded-lg p-4">
+                <div class="bg-gray-50 rounded-lg p-4" id={"svelte-section-#{@icon.id}"} phx-hook="SvelteColor"
+                     data-name={@icon.name |> String.downcase() |> String.replace(" ", "_")}
+                     data-style={@icon.style}
+                     data-sizes={Jason.encode!(@icon.sizes)}>
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-600">Svelte (svelte-fluentui)</span>
+                    <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                      <input type="checkbox" class="svelte-include-color w-3.5 h-3.5 rounded border-gray-300" />
+                      Include color
+                    </label>
                   </div>
-                  <div class="space-y-1">
+                  <div class="space-y-1 svelte-code-list">
                     <%= for size <- @icon.sizes do %>
                       <div class="flex items-center justify-between bg-white rounded px-3 py-2 border border-gray-200">
-                        <code id={"svelte-#{@icon.id}-#{size}"} class="text-sm text-orange-600"><%= svelte_identifier(@icon, size) %></code>
+                        <code id={"svelte-#{@icon.id}-#{size}"} class="text-sm text-orange-600" data-size={size}><%= svelte_identifier(@icon, size) %></code>
                         <button
                           type="button"
                           phx-click={JS.dispatch("phx:copy", to: "#svelte-#{@icon.id}-#{size}")}
@@ -573,6 +668,34 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                         >Copy</button>
                       </div>
                     <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Filename -->
+              <%= if @platform_prefs.filename do %>
+                <div class="bg-gray-50 rounded-lg p-4" id={"filename-section-#{@icon.id}"} phx-hook="FilenameTemplate"
+                     data-name={@icon.name} data-style={@icon.style} data-sizes={Jason.encode!(@icon.sizes)}>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-600">Filename (local copy)</span>
+                  </div>
+                  <div class="mb-1 text-xs text-gray-500">
+                    <span class="font-medium">Placeholders:</span>
+                    <code class="bg-gray-200 px-1 rounded">{filename}</code>
+                    <code class="bg-gray-200 px-1 rounded">{name}</code>
+                    <code class="bg-gray-200 px-1 rounded">{name_snake}</code>
+                    <code class="bg-gray-200 px-1 rounded">{name_pascal}</code>
+                    <code class="bg-gray-200 px-1 rounded">{name_kebab}</code>
+                    <code class="bg-gray-200 px-1 rounded">{size}</code>
+                    <code class="bg-gray-200 px-1 rounded">{style}</code>
+                  </div>
+                  <div class="mb-3">
+                    <input type="text" id={"filename-template-input-#{@icon.id}"}
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="/my/assets/{filename}" />
+                  </div>
+                  <div id={"filename-results-#{@icon.id}"} class="space-y-1">
+                    <!-- Populated by JavaScript -->
                   </div>
                 </div>
               <% end %>
@@ -646,13 +769,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         >
           <!-- Icon Preview -->
           <div class="w-12 h-12 mx-auto mb-3 flex items-center justify-center">
-            <img
-              src={Icon.svg_url(icon, default_size(icon.sizes))}
-              alt={icon.name}
-              class="max-w-full max-h-full"
-              loading="lazy"
-              onerror="this.style.display='none'"
-            />
+            <span class="inline-svg-icon inline-flex items-center justify-center w-8 h-8" data-svg-url={Icon.svg_url(icon, default_size(icon.sizes))}></span>
           </div>
 
           <!-- Icon Name -->
@@ -716,12 +833,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                 class="hover:bg-blue-50 cursor-pointer transition-colors"
               >
                 <td class="px-4 py-3">
-                  <img
-                    src={Icon.svg_url(icon, default_size(icon.sizes))}
-                    alt={icon.name}
-                    class="w-6 h-6"
-                    loading="lazy"
-                  />
+                  <span class="inline-svg-icon inline-flex items-center justify-center w-6 h-6" data-svg-url={Icon.svg_url(icon, default_size(icon.sizes))}></span>
                 </td>
                 <td class="px-4 py-3 font-medium text-gray-900"><%= icon.name %></td>
                 <td class="px-4 py-3 text-center">
@@ -770,5 +882,34 @@ defmodule FluentuiIconsWeb.IconSearchLive do
   defp svelte_identifier(icon, size) do
     name = icon.name |> String.downcase() |> String.replace(" ", "_")
     ~s(<Icon name="#{name}" size={#{size}} variant="#{icon.style}" />)
+  end
+
+  # Format numbers with k/m suffixes (1000 -> 1k, 3400 -> 3.4k, 1500000 -> 1.5m)
+  defp format_number(n) when n >= 1_000_000 do
+    formatted = Float.round(n / 1_000_000, 1)
+    if formatted == trunc(formatted), do: "#{trunc(formatted)}m", else: "#{formatted}m"
+  end
+
+  defp format_number(n) when n >= 1_000 do
+    formatted = Float.round(n / 1_000, 1)
+    if formatted == trunc(formatted), do: "#{trunc(formatted)}k", else: "#{formatted}k"
+  end
+
+  defp format_number(n), do: to_string(n)
+
+  # Format sync timestamp as relative time or date
+  defp format_sync_time(nil), do: "Never"
+
+  defp format_sync_time(%DateTime{} = dt) do
+    now = DateTime.utc_now()
+    diff_seconds = DateTime.diff(now, dt, :second)
+
+    cond do
+      diff_seconds < 60 -> "just now"
+      diff_seconds < 3600 -> "#{div(diff_seconds, 60)} minutes ago"
+      diff_seconds < 86400 -> "#{div(diff_seconds, 3600)} hours ago"
+      diff_seconds < 604_800 -> "#{div(diff_seconds, 86400)} days ago"
+      true -> Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
+    end
   end
 end

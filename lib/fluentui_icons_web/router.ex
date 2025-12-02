@@ -14,6 +14,11 @@ defmodule FluentuiIconsWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Serve icon SVGs directly (no pipeline overhead)
+  scope "/icons", FluentuiIconsWeb do
+    get "/:style/:filename", IconFileController, :show
+  end
+
   scope "/", FluentuiIconsWeb do
     pipe_through :browser
 
