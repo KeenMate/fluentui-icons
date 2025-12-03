@@ -243,6 +243,9 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         <div class="mb-8">
           <h1 class="text-3xl font-bold text-gray-900">FluentUI Icon Search</h1>
           <p class="text-gray-600 mt-1">Search <%= @icon_count %> icons from Microsoft's FluentUI System Icons</p>
+          <p class="text-sm text-gray-500 mt-2">
+            Using Claude? Try our <a href="https://www.npmjs.com/package/@keenmate/fluentui-icons-mcp" target="_blank" rel="noreferrer" class="text-blue-600 hover:underline">MCP server</a> to search icons directly from Claude Desktop or Claude Code.
+          </p>
         </div>
 
         <!-- Sticky Header Section -->

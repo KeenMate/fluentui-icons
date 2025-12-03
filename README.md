@@ -4,6 +4,28 @@ A fast, searchable database of 6000+ Microsoft FluentUI System Icons with platfo
 
 **Live:** [fluentui-icons.keenmate.dev](https://fluentui-icons.keenmate.dev)
 
+## MCP Server for Claude
+
+Search FluentUI icons directly from Claude Desktop, Claude Code, or any MCP client:
+
+```bash
+npx @keenmate/fluentui-icons-mcp
+```
+
+Add to your Claude config:
+```json
+{
+  "mcpServers": {
+    "fluentui-icons": {
+      "command": "npx",
+      "args": ["-y", "@keenmate/fluentui-icons-mcp"]
+    }
+  }
+}
+```
+
+See [@keenmate/fluentui-icons-mcp](https://www.npmjs.com/package/@keenmate/fluentui-icons-mcp) on npm.
+
 ## Features
 
 - **Search 6000+ FluentUI icons** by name with fuzzy matching and 50k+ synonyms (extracted from FluentUI metadata)
