@@ -17,6 +17,7 @@
   - Track missing SVG files during sync
   - Discrepancy report page at `/sync/discrepancies`
   - Footer link shows discrepancy count when > 0
+  - Icon names link to Microsoft GitHub repo for easy upstream verification
 - Maintenance API endpoint (`POST /api/maintenance/:task`) for remote task execution
   - Tasks: `sync`, `clean`, `cube`
   - API key authentication via `X-API-Key` header (set `MAINTENANCE_API_KEY` env var)

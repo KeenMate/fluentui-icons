@@ -74,7 +74,15 @@ defmodule FluentuiIconsWeb.SyncDiscrepanciesLive do
                     <%= for {icon_name, issues} <- @grouped do %>
                       <tr>
                         <td class="px-4 py-3 whitespace-nowrap">
-                          <span class="font-medium text-gray-900"><%= icon_name %></span>
+                          <a href={"https://github.com/microsoft/fluentui-system-icons/tree/main/assets/#{icon_name}"}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             class="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                            <%= icon_name %>
+                            <svg class="w-3 h-3 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
                         </td>
                         <td class="px-4 py-3">
                           <div class="flex flex-wrap gap-2">
