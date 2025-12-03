@@ -53,7 +53,8 @@ defmodule FluentuiIcons.MixProject do
       {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.7"},
       {:req, "~> 0.4"},
-      {:quantum, "~> 3.5"}
+      {:quantum, "~> 3.5"},
+      {:hammer, "~> 7.0"}
     ]
   end
 

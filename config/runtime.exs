@@ -13,6 +13,11 @@ if icons_path = System.get_env("ICONS_PATH") do
   config :fluentui_icons, :icons_path, icons_path
 end
 
+# Maintenance API key for remote task execution
+if maintenance_key = System.get_env("MAINTENANCE_API_KEY") do
+  config :fluentui_icons, :maintenance_api_key, maintenance_key
+end
+
 # Start the phoenix server if environment is set and running in a release
 if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
   config :fluentui_icons, FluentuiIconsWeb.Endpoint, server: true

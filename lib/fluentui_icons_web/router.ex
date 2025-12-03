@@ -32,6 +32,9 @@ defmodule FluentuiIconsWeb.Router do
 
     get "/icons/search", IconController, :search
     get "/health", HealthController, :index
+
+    # Maintenance endpoint (rate-limited, API key protected)
+    post "/maintenance/:api_key/:task", MaintenanceController, :run
   end
 
   # Enables LiveDashboard only for development

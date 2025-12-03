@@ -17,6 +17,8 @@ defmodule FluentuiIcons.Application do
       FluentuiIconsWeb.Telemetry,
       # Start the PubSub system
       {Phoenix.PubSub, name: FluentuiIcons.PubSub},
+      # Start the rate limiter for API protection
+      {FluentuiIcons.RateLimiter, clean_period: :timer.minutes(1)},
       # Start the Quantum scheduler
       FluentuiIcons.Scheduler,
       # Start the Endpoint (http/https)
