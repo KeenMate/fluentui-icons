@@ -706,7 +706,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
                       <.platform_icon name="svelte" class="w-4 h-4" />
-                      Svelte (svelte-fluentui)
+                      Svelte (<a href="https://svelte-fluentui.keenmate.dev" target="_blank" rel="noreferrer" referrerpolicy="unsafe-url" class="text-blue-600 hover:underline">svelte-fluentui</a>)
                     </span>
                     <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
                       <input type="checkbox" class="svelte-include-color w-3.5 h-3.5 rounded border-gray-300" />
