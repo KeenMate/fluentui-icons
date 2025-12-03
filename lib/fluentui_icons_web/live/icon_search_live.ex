@@ -406,14 +406,38 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         <% end %>
 
         <!-- API Info -->
-        <div class="mt-12 p-4 bg-gray-100 rounded-lg">
-          <h2 class="font-semibold text-gray-900 mb-2">API Access</h2>
-          <p class="text-sm text-gray-600 mb-2">
-            Use the JSON API to search icons programmatically:
+        <div class="mt-12 p-6 bg-gray-100 rounded-lg">
+          <h2 class="font-semibold text-gray-900 mb-3">API Access</h2>
+          <p class="text-sm text-gray-600 mb-4">
+            Search icons programmatically via our REST API. Perfect for AI assistants, build tools, and automation.
           </p>
-          <code class="text-sm bg-white px-2 py-1 rounded border">
+
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Endpoint</h3>
+          <code class="block text-sm bg-white px-3 py-2 rounded border mb-4">
             GET /api/icons/search?q=pen&size=48
           </code>
+
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Parameters</h3>
+          <ul class="text-sm text-gray-600 mb-4 space-y-1">
+            <li><code class="bg-white px-1 rounded">q</code> — Search query (required)</li>
+            <li><code class="bg-white px-1 rounded">size</code> — Filter by size: 16, 20, 24, 28, 32, 48</li>
+            <li><code class="bg-white px-1 rounded">style</code> — Filter by style: regular, filled</li>
+            <li><code class="bg-white px-1 rounded">limit</code> — Max results (default: 50, max: 100)</li>
+            <li><code class="bg-white px-1 rounded">format</code> — Response format: json, compact, text</li>
+          </ul>
+
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Response Formats</h3>
+          <ul class="text-sm text-gray-600 mb-4 space-y-1">
+            <li><code class="bg-white px-1 rounded">json</code> — Full response with all metadata (default)</li>
+            <li><code class="bg-white px-1 rounded">compact</code> — Minimal JSON: name, style, url</li>
+            <li><code class="bg-white px-1 rounded">text</code> — Plain text, one icon per line (most token-efficient for AI)</li>
+          </ul>
+
+          <h3 class="text-sm font-medium text-gray-700 mb-2">AI Integration</h3>
+          <p class="text-sm text-gray-600">
+            For LLM/AI integration, see <a href="/llms.txt" class="text-blue-600 hover:underline">/llms.txt</a> or
+            <a href="/.well-known/ai-plugin.json" class="text-blue-600 hover:underline">/.well-known/ai-plugin.json</a>
+          </p>
         </div>
 
         <!-- Footer -->
@@ -736,22 +760,6 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               <% end %>
             </div>
 
-            <!-- SVG URLs -->
-            <div class="mt-6">
-              <h3 class="text-sm font-medium text-gray-700 mb-2">SVG URLs</h3>
-              <div class="space-y-1">
-                <%= for size <- @icon.sizes do %>
-                  <div class="flex items-center gap-2 text-xs">
-                    <span class="text-gray-500 w-10"><%= size %>px:</span>
-                    <a
-                      href={Icon.svg_url(@icon, size)}
-                      target="_blank"
-                      class="text-blue-600 hover:underline truncate flex-1"
-                    ><%= Icon.svg_url(@icon, size) %></a>
-                  </div>
-                <% end %>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -859,16 +867,16 @@ defmodule FluentuiIconsWeb.IconSearchLive do
 
   defp icon_list(assigns) do
     ~H"""
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div class="overflow-x-auto">
+    <div class="bg-white rounded-lg border border-gray-200">
+      <div>
         <table class="w-full text-sm">
-          <thead class="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
+          <thead class="bg-gray-100 border-b-2 border-gray-300 sticky-table-header">
             <tr>
-              <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base">Icon</th>
-              <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base">Name</th>
-              <th class="px-4 py-4 text-center font-semibold text-gray-700 text-base">Style</th>
+              <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base sticky bg-gray-100 z-20" style="top: var(--sticky-header-height, 0px)">Icon</th>
+              <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base sticky bg-gray-100 z-20" style="top: var(--sticky-header-height, 0px)">Name</th>
+              <th class="px-4 py-4 text-center font-semibold text-gray-700 text-base sticky bg-gray-100 z-20" style="top: var(--sticky-header-height, 0px)">Style</th>
               <%= for size <- [16, 20, 24, 28, 32, 48] do %>
-                <th class="px-3 py-4 text-center font-semibold text-gray-700 text-sm"><%= size %></th>
+                <th class="px-3 py-4 text-center font-semibold text-gray-700 text-sm sticky bg-gray-100 z-20" style="top: var(--sticky-header-height, 0px)"><%= size %></th>
               <% end %>
             </tr>
           </thead>

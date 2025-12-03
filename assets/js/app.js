@@ -75,12 +75,29 @@ Hooks.PlatformPrefs = {
 // View mode hook - persists grid/list preference to localStorage and updates CSS attribute
 Hooks.ViewMode = {
   mounted() {
+    // Calculate sticky header height for table header positioning
+    this.updateStickyHeaderHeight()
+    window.addEventListener('resize', () => this.updateStickyHeaderHeight())
+
     // Listen for view mode changes from LiveView
     this.handleEvent("save_view_mode", ({mode}) => {
       localStorage.setItem("icon_view_mode", mode)
       // Update CSS attribute immediately for instant visual switch
       document.documentElement.setAttribute('data-view-mode', mode)
     })
+  },
+
+  updated() {
+    // Recalculate when DOM updates (e.g., filters change)
+    this.updateStickyHeaderHeight()
+  },
+
+  updateStickyHeaderHeight() {
+    const stickyHeader = document.querySelector('.sticky.top-0.z-20')
+    if (stickyHeader) {
+      const height = stickyHeader.offsetHeight
+      document.documentElement.style.setProperty('--sticky-header-height', `${height}px`)
+    }
   }
 }
 

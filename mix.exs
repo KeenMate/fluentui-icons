@@ -51,7 +51,7 @@ defmodule FluentuiIcons.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.7"},
+      {:bandit, "~> 1.0"},
       {:req, "~> 0.4"},
       {:quantum, "~> 3.5"},
       {:hammer, "~> 7.0"}

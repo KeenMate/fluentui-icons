@@ -22,7 +22,6 @@ help: ## Show this help message
 # Development commands
 install: ## Install all dependencies
 	mix deps.get
-	cd assets && npm install
 
 dev: ## Start development server
 	mix phx.server
@@ -52,7 +51,6 @@ clean: ## Clean build artifacts
 
 clean-all: clean ## Clean everything including deps
 	rm -rf deps/
-	rm -rf assets/node_modules/
 
 # Docker commands
 docker-build: ## Build Docker image
@@ -104,7 +102,6 @@ status: ## Show project status
 	@echo "Mix version: $(shell mix --version)"
 	@echo "Project directory: $(shell pwd)"
 	@echo "Dependencies installed: $(shell test -d deps && echo "✓" || echo "✗")"
-	@echo "Assets installed: $(shell test -d assets/node_modules && echo "✓" || echo "✗")"
 	@echo "Build exists: $(shell test -d _build/prod && echo "✓" || echo "✗")"
 
 info: status ## Alias for status

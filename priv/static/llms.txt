@@ -1,0 +1,26 @@
+# FluentUI Icons Search API
+
+This site provides access to Microsoft's FluentUI icon library.
+
+## API Endpoint
+GET /api/icons/search
+
+## Parameters
+- q: Search query (required) - e.g., "pen", "calendar", "user"
+- size: Filter by size (optional) - 16, 20, 24, 28, 32, 48
+- style: Filter by style (optional) - "regular" or "filled"
+- limit: Max results (optional, default: 50, max: 100)
+- format: Response format (optional, default: "json")
+  - "json" - Full response with all icon metadata
+  - "compact" - Minimal JSON with name, style, url only
+  - "text" - Plain text, one icon per line (most token-efficient)
+
+## Example
+GET /api/icons/search?q=pen&format=text
+
+Response:
+Pen → regular: /icons/regular/ic_fluent_pen_24_regular.svg
+Pen → filled: /icons/filled/ic_fluent_pen_24_filled.svg
+
+## Usage
+Icons can be used via SVG URL directly in HTML/Markdown.

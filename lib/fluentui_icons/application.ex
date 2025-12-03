@@ -19,6 +19,8 @@ defmodule FluentuiIcons.Application do
       {Phoenix.PubSub, name: FluentuiIcons.PubSub},
       # Start the rate limiter for API protection
       {FluentuiIcons.RateLimiter, clean_period: :timer.minutes(1)},
+      # Start the search metrics collector (batched DB writes)
+      FluentuiIcons.SearchMetricsCollector,
       # Start the Quantum scheduler
       FluentuiIcons.Scheduler,
       # Start the Endpoint (http/https)

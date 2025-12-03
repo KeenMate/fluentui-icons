@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "FluentUI Icons",
+  "name_for_model": "fluentui_icons",
+  "description_for_human": "Search Microsoft's FluentUI icon library",
+  "description_for_model": "Search for icons from Microsoft's FluentUI library. Use the search endpoint with a query term to find icons by name. Returns SVG URLs that can be embedded directly. Use format=text for most token-efficient output.",
+  "api": {
+    "type": "openapi",
+    "url": "https://fluentui-icons.keenmate.dev/.well-known/openapi.yaml"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "logo_url": "https://fluentui-icons.keenmate.dev/favicon.ico",
+  "contact_email": "support@keenmate.com",
+  "legal_info_url": "https://fluentui-icons.keenmate.dev"
+}

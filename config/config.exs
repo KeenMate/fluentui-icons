@@ -14,6 +14,7 @@ config :fluentui_icons,
 
 # Configures the endpoint
 config :fluentui_icons, FluentuiIconsWeb.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],
   render_errors: [view: FluentuiIconsWeb.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: FluentuiIcons.PubSub,

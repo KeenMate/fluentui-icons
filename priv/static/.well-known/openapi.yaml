@@ -1,0 +1,77 @@
+openapi: 3.0.0
+info:
+  title: FluentUI Icons API
+  description: Search Microsoft's FluentUI icon library
+  version: 1.0.0
+servers:
+  - url: https://fluentui-icons.keenmate.dev
+paths:
+  /api/icons/search:
+    get:
+      operationId: searchIcons
+      summary: Search for icons by name
+      description: Search the FluentUI icon library. Use format=text for most token-efficient output.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (e.g., "pen", "calendar", "user")
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          description: Filter by icon size
+          schema:
+            type: integer
+            enum: [16, 20, 24, 28, 32, 48]
+        - name: style
+          in: query
+          required: false
+          description: Filter by icon style
+          schema:
+            type: string
+            enum: [regular, filled]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results (default 50, max 100)
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: format
+          in: query
+          required: false
+          description: Response format
+          schema:
+            type: string
+            enum: [json, compact, text]
+            default: json
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        style:
+                          type: string
+                        svg_url:
+                          type: string
+            text/plain:
+              schema:
+                type: string
+                description: One icon per line in format "Name → style: /icons/style/filename.svg"
