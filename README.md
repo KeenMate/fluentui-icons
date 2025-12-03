@@ -62,10 +62,64 @@ make docker-deploy-registry
 make migrate-prod
 ```
 
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DB_USERNAME` | Yes | - | PostgreSQL username |
+| `DB_PASSWORD` | Yes | - | PostgreSQL password |
+| `DB_HOSTNAME` | Yes | - | PostgreSQL host |
+| `DB_DATABASE` | Yes | - | PostgreSQL database name |
+| `SECRET_KEY_BASE` | Yes | - | Phoenix secret (generate with `mix phx.gen.secret`) |
+| `PHX_HOST` | Yes | - | Public hostname (e.g., `fluentui-icons.example.com`) |
+| `PORT` | No | `4000` | HTTP port |
+| `ICONS_PATH` | No | - | Directory for SVG storage (e.g., `/app/icons`) |
+| `AUTO_MIGRATE` | No | `true` | Run migrations on startup |
+| `MAINTENANCE_API_KEY` | No | - | API key for maintenance endpoints |
+| `POOL_SIZE` | No | `10` | Database connection pool size |
+
+### Docker Compose Example
+
+```yaml
+services:
+  fluentui-icons:
+    image: your-registry/fluentui-icons:prod
+    environment:
+      - DB_USERNAME=fluentui_icons
+      - DB_PASSWORD=secret
+      - DB_HOSTNAME=postgres
+      - DB_DATABASE=fluentui_icons
+      - SECRET_KEY_BASE=your-secret-key
+      - PHX_HOST=fluentui-icons.example.com
+      - ICONS_PATH=/app/icons
+      - MAINTENANCE_API_KEY=your-maintenance-key
+    volumes:
+      - ./data:/app/icons
+```
+
+### Performance Note
+
+The Docker image includes **7zip** (`p7zip-full`) for fast ZIP extraction during icon sync. This is ~10x faster than the Erlang fallback. The sync automatically detects and uses the best available tool (7zip > unzip > Erlang).
+
 ## API
 
+### Search Icons
 ```
 GET /api/icons/search?q=pen&size=24&style=regular
+```
+
+### Maintenance (requires API key)
+```bash
+# Trigger full sync from GitHub
+curl -X POST -H "X-API-Key: your-key" https://example.com/api/maintenance/sync
+
+# Refresh metrics cube
+curl -X POST -H "X-API-Key: your-key" https://example.com/api/maintenance/cube
+
+# Clean icons from database
+curl -X POST -H "X-API-Key: your-key" https://example.com/api/maintenance/clean
 ```
 
 ## Built With
