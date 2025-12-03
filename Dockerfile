@@ -76,8 +76,8 @@ RUN groupadd -r fluentui && useradd -r -g fluentui fluentui
 # Copy the release from builder
 COPY --from=builder --chown=fluentui:fluentui /app/_build/prod/rel/fluentui_icons ./
 
-# Create icons directory with proper permissions
-RUN mkdir -p /app/icons && chown fluentui:fluentui /app/icons
+# Create icons directories with proper permissions
+RUN mkdir -p /app/icons /srv/icons && chown fluentui:fluentui /app/icons /srv/icons
 
 # Ensure scripts are executable
 RUN chmod +x /app/bin/*
