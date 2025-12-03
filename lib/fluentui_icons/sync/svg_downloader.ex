@@ -275,8 +275,14 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
 
         if style do
           target_path = Path.join([output_dir, style, filename])
-          File.rename(svg_path, target_path)
-          :ok
+          # Use File.copy instead of File.rename - rename fails across filesystems
+          # (e.g., /tmp inside container vs mounted volume at /app/icons)
+          case File.copy(svg_path, target_path) do
+            {:ok, _} -> :ok
+            {:error, reason} ->
+              Logger.warning("Failed to copy #{filename}: #{inspect(reason)}")
+              :error
+          end
         else
           :skipped
         end

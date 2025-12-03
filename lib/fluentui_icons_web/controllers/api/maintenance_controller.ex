@@ -4,9 +4,12 @@ defmodule FluentuiIconsWeb.API.MaintenanceController do
   Allows triggering maintenance tasks remotely via authenticated HTTP requests.
 
   Protected by:
-  - API key authentication (MAINTENANCE_API_KEY env var)
+  - API key authentication via X-API-Key header (MAINTENANCE_API_KEY env var)
   - Rate limiting (5 attempts per 5 minutes per IP)
   - Timing-safe comparison to prevent timing attacks
+
+  Usage:
+    curl -X POST -H "X-API-Key: your-key" https://example.com/api/maintenance/sync
   """
   use FluentuiIconsWeb, :controller
 
@@ -14,8 +17,9 @@ defmodule FluentuiIconsWeb.API.MaintenanceController do
   @rate_limit 5
   @rate_scale :timer.minutes(5)
 
-  def run(conn, %{"api_key" => api_key, "task" => task}) do
+  def run(conn, %{"task" => task}) do
     ip = get_client_ip(conn)
+    api_key = get_api_key(conn)
     configured_key = Application.get_env(:fluentui_icons, :maintenance_api_key)
 
     case FluentuiIcons.RateLimiter.hit("maintenance:#{ip}", @rate_scale, @rate_limit) do
@@ -30,12 +34,22 @@ defmodule FluentuiIconsWeb.API.MaintenanceController do
           is_nil(configured_key) or configured_key == "" ->
             conn |> put_status(503) |> json(%{error: "Maintenance API not configured"})
 
+          is_nil(api_key) or api_key == "" ->
+            conn |> put_status(401) |> json(%{error: "Missing X-API-Key header"})
+
           not Plug.Crypto.secure_compare(api_key, configured_key) ->
             conn |> put_status(401) |> json(%{error: "Invalid API key"})
 
           true ->
             execute_task(conn, task)
         end
+    end
+  end
+
+  defp get_api_key(conn) do
+    case Plug.Conn.get_req_header(conn, "x-api-key") do
+      [key | _] -> key
+      [] -> nil
     end
   end
 
