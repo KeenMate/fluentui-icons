@@ -1,90 +1,113 @@
 defmodule FluentuiIcons.Sync.Worker do
   @moduledoc """
-  Worker module that fetches and syncs FluentUI icons from GitHub.
+  Worker module that syncs FluentUI icons from GitHub.
+
+  Uses a single ZIP download as the source of truth to ensure consistency
+  between the icon database and SVG files.
   """
 
   require Logger
-  alias FluentuiIcons.{Repo, Icons.Icon, Sync.Parser, Sync.SvgDownloader, Sync.SyncRun}
+  alias FluentuiIcons.{Repo, Icons.Icon}
+  alias FluentuiIcons.Sync.{SvgDownloader, SyncRun, MetaphorExtractor}
   import Ecto.Query
 
-  @base_url "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/main"
   @styles ~w(regular filled color light)
 
   @doc """
-  Sync all icon styles from GitHub.
+  Sync all icons from GitHub using the ZIP file as single source of truth.
 
-  This fetches all 4 markdown files (regular, filled, color, light) and
-  updates the database with the parsed icons.
-
-  ## Options
-    * `:download_svgs` - Also download SVG files after syncing (default: true)
+  This downloads the ZIP once, parses icons from metadata.json files,
+  extracts SVGs, and updates the database - ensuring everything is consistent.
   """
-  def sync_all(opts \\ []) do
-    download_svgs = Keyword.get(opts, :download_svgs, true)
-    Logger.info("Starting FluentUI icons sync...")
+  def sync_all(_opts \\ []) do
+    Logger.info("Starting FluentUI icons sync (unified ZIP method)...")
 
-    # Start tracking the sync run
-    {:ok, sync_run} = SyncRun.start("icon_sync")
+    {:ok, sync_run} = SyncRun.start("full_sync")
 
-    results =
-      Enum.map(@styles, fn style ->
-        case sync_style(style) do
-          {:ok, count} ->
-            Logger.info("Synced #{count} #{style} icons")
-            {:ok, style, count}
+    case SvgDownloader.download_and_parse() do
+      {:ok, %{icons: icons, metaphors: metaphors, svg_count: svg_count, discrepancies: discrepancies}} ->
+        Logger.info("ZIP processed: #{length(icons)} icon variants, #{svg_count} SVGs")
 
-          {:error, reason} ->
-            Logger.error("Failed to sync #{style}: #{inspect(reason)}")
-            {:error, style, reason}
+        # Insert icons to database
+        icon_count = insert_icons(icons)
+        Logger.info("Inserted #{icon_count} icons to database")
+
+        # Seed metaphors as synonyms
+        if map_size(metaphors) > 0 do
+          Logger.info("Seeding #{map_size(metaphors)} icon metaphors as synonyms...")
+          MetaphorExtractor.seed_metaphors(metaphors)
         end
-      end)
 
-    successes = Enum.count(results, &match?({:ok, _, _}, &1))
-    total = results |> Enum.filter(&match?({:ok, _, _}, &1)) |> Enum.map(&elem(&1, 2)) |> Enum.sum()
-    Logger.info("Sync complete: #{successes}/#{length(@styles)} styles succeeded (#{total} total icons)")
+        # Log discrepancies
+        if length(discrepancies) > 0 do
+          Logger.warning("Found #{length(discrepancies)} metadata discrepancies (missing SVG files)")
+        end
 
-    # Record sync completion
-    if successes > 0 do
-      SyncRun.complete(sync_run, %{icons_synced: total})
-    else
-      errors = results |> Enum.filter(&match?({:error, _, _}, &1)) |> Enum.map(&elem(&1, 2)) |> Enum.join(", ")
-      SyncRun.fail(sync_run, errors)
+        SyncRun.complete(sync_run, %{
+          icons_synced: icon_count,
+          svgs_downloaded: svg_count,
+          discrepancies: discrepancies,
+          discrepancy_count: length(discrepancies)
+        })
+        Logger.info("Sync complete!")
+
+        {:ok, %{icons: icon_count, svgs: svg_count, synonyms: map_size(metaphors), discrepancies: length(discrepancies)}}
+
+      {:error, reason} ->
+        Logger.error("Sync failed: #{inspect(reason)}")
+        SyncRun.fail(sync_run, inspect(reason))
+        {:error, reason}
     end
+  end
 
-    # Download SVGs after successful sync (using ZIP method for speed)
-    if download_svgs and successes > 0 do
-      Logger.info("Starting SVG download from ZIP...")
-      SvgDownloader.download_from_zip()
-    end
+  defp insert_icons(icons) do
+    Repo.transaction(fn ->
+      # Clear all existing icons
+      Repo.delete_all(Icon)
 
-    results
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      icons
+      |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
+      |> Enum.chunk_every(500)
+      |> Enum.each(&Repo.insert_all(Icon, &1))
+    end)
+
+    length(icons)
   end
 
   @doc """
   Sync a single icon style from GitHub.
+  Note: This still uses the unified ZIP method but filters by style.
+  For full sync, use sync_all/0.
   """
   def sync_style(style) when style in @styles do
-    url = "#{@base_url}/icons_#{style}.md"
+    Logger.info("Syncing #{style} icons (uses full ZIP download)...")
 
-    with {:ok, %{status: 200, body: body}} <- Req.get(url, retry: :transient, retry_delay: 1000),
-         icons when icons != [] <- Parser.parse(body, style) do
-      # Delete old icons for this style and insert new ones in a transaction
-      Repo.transaction(fn ->
-        Repo.delete_all(from(i in Icon, where: i.style == ^style))
+    case SvgDownloader.download_and_parse() do
+      {:ok, %{icons: icons, metaphors: metaphors}} ->
+        style_icons = Enum.filter(icons, &(&1.style == style))
 
-        now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        Repo.transaction(fn ->
+          Repo.delete_all(from(i in Icon, where: i.style == ^style))
 
-        icons
-        |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
-        |> Enum.chunk_every(500)
-        |> Enum.each(&Repo.insert_all(Icon, &1))
-      end)
+          now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
-      {:ok, length(icons)}
-    else
-      {:ok, %{status: status}} -> {:error, "HTTP #{status}"}
-      {:error, reason} -> {:error, reason}
-      [] -> {:error, "No icons parsed"}
+          style_icons
+          |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
+          |> Enum.chunk_every(500)
+          |> Enum.each(&Repo.insert_all(Icon, &1))
+        end)
+
+        # Also seed metaphors
+        if map_size(metaphors) > 0 do
+          MetaphorExtractor.seed_metaphors(metaphors)
+        end
+
+        {:ok, length(style_icons)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

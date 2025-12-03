@@ -358,4 +358,33 @@ defmodule FluentuiIcons.Icons do
 
   defp maybe_filter_cube_action(query, nil), do: query
   defp maybe_filter_cube_action(query, action), do: where(query, [c], c.action == ^action)
+
+  # ---- Platform Popularity ----
+
+  @doc """
+  Get copy counts by platform, ordered by popularity.
+
+  Returns a list of {platform, count} tuples, e.g.:
+  [{"react", 150}, {"svelte", 120}, {"ios", 80}, {"android", 60}, {"filename", 30}]
+  """
+  def platform_popularity do
+    from(m in IconMetric,
+      where: m.action == "copy" and not is_nil(m.platform),
+      group_by: m.platform,
+      select: {m.platform, count(m.id)},
+      order_by: [desc: count(m.id)]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Get the recommended platform order based on usage.
+  Falls back to default order if no data.
+  """
+  def platform_order do
+    case platform_popularity() do
+      [] -> ["ios", "android", "react", "svelte", "filename"]
+      stats -> Enum.map(stats, fn {platform, _count} -> platform end)
+    end
+  end
 end

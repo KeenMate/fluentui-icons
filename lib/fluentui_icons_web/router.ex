@@ -23,6 +23,7 @@ defmodule FluentuiIconsWeb.Router do
     pipe_through :browser
 
     live "/", IconSearchLive, :index
+    live "/sync/discrepancies", SyncDiscrepanciesLive, :index
   end
 
   # API endpoints for AI models and programmatic access

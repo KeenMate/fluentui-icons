@@ -6,14 +6,18 @@ A fast, searchable database of 6000+ Microsoft FluentUI System Icons with platfo
 
 ## Features
 
-- Search 6000+ FluentUI icons by name with fuzzy matching and synonyms
-- Filter by style (regular, filled, color, light) and size (16, 20, 24, 28, 32, 48)
-- Grid and list view with size availability matrix
-- Platform identifiers for iOS (Swift), Android (Kotlin/Java), React, and Svelte
-- Copy-to-clipboard for all identifiers
-- SVG URLs for direct use
-- JSON API for programmatic access
-- Automatic daily sync with Microsoft's FluentUI repository
+- **Search 6000+ FluentUI icons** by name with fuzzy matching and 50k+ synonyms (extracted from FluentUI metadata)
+- **Filter** by style (regular, filled, color, light) and size (16, 20, 24, 28, 32, 48)
+- **Grid and list views** with size availability matrix
+- **Platform identifiers** for iOS (Swift), Android (Kotlin/Java), React, and Svelte
+- **Quick copy buttons** - hover over grid cards or list rows to copy platform identifiers
+- **Customizable filename templates** with placeholders ({filename}, {name}, {size}, {style}, etc.)
+- **Color preview** - pick custom colors for icon preview in modal
+- **Platform preferences** - toggle and reorder platforms, persisted in localStorage
+- **Usage tracking** - tracks copy/download stats and platform popularity
+- **Self-hosted SVGs** - icons served locally for performance and offline access
+- **JSON API** for programmatic access
+- **Automatic daily sync** with Microsoft's FluentUI repository (ZIP-based, single source of truth)
 
 ## Development
 
@@ -29,6 +33,21 @@ make dev
 ```
 
 Visit [localhost:4000](http://localhost:4000)
+
+## Mix Tasks
+
+```bash
+# Download icons from FluentUI repository
+mix icons.download
+
+# Clean icons/synonyms from database (for fresh reload)
+mix icons.clean          # icons + synonyms only
+mix icons.clean --all    # also clears metrics
+mix icons.clean --files  # also deletes SVG files
+
+# Refresh metrics cube (run nightly for dashboard stats)
+mix icons.cube
+```
 
 ## Deployment
 

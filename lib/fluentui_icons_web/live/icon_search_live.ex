@@ -6,6 +6,8 @@ defmodule FluentuiIconsWeb.IconSearchLive do
   alias FluentuiIcons.Sync.SyncRun
   alias Phoenix.LiveView.JS
 
+  import FluentuiIconsWeb.Components.PlatformIcons
+
   @per_page 30
 
   @impl true
@@ -19,12 +21,15 @@ defmodule FluentuiIconsWeb.IconSearchLive do
     default_prefs = %{ios: true, android: true, react: true, svelte: true, filename: true}
     platform_prefs = Map.merge(default_prefs, platform_prefs)
 
+    last_sync = SyncRun.last_successful()
+
     {:ok,
      socket
      |> assign(icon_count: Icons.count())
      |> assign(platform_prefs: platform_prefs)
      |> assign(view_mode: view_mode)
-     |> assign(last_sync_at: SyncRun.last_sync_at())}
+     |> assign(last_sync_at: last_sync && last_sync.completed_at)
+     |> assign(discrepancy_count: last_sync && last_sync.discrepancy_count || 0)}
   end
 
   @impl true
@@ -232,6 +237,8 @@ defmodule FluentuiIconsWeb.IconSearchLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-gray-50">
+      <!-- Hidden element for metrics tracking from JS -->
+      <div id="metrics-tracker" phx-hook="MetricsTracker" class="hidden"></div>
       <div class="max-w-7xl mx-auto px-4 py-8">
         <div class="mb-8">
           <h1 class="text-3xl font-bold text-gray-900">FluentUI Icon Search</h1>
@@ -370,10 +377,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
         <!-- Icon Display (Grid or List) - Both rendered, CSS controls visibility -->
         <div id="icon-display" phx-hook="IconColorFilter">
           <div class="view-grid">
-            <.icon_grid icons={@icons} selected_styles={@selected_styles} selected_sizes={@selected_sizes} />
+            <.icon_grid icons={@icons} selected_styles={@selected_styles} selected_sizes={@selected_sizes} platform_prefs={@platform_prefs} />
           </div>
           <div class="view-list">
-            <.icon_list icons={@icons} />
+            <.icon_list icons={@icons} platform_prefs={@platform_prefs} />
           </div>
         </div>
 
@@ -413,8 +420,13 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               Made by <a href="https://keenmate.com" rel="noreferrer" referrerpolicy="origin" class="text-blue-600 hover:underline">Keenmate</a>
             </div>
             <%= if @last_sync_at do %>
-              <div class="text-xs text-gray-400">
-                Last synced: <%= format_sync_time(@last_sync_at) %>
+              <div class="text-xs text-gray-400 flex items-center gap-2">
+                <span>Last synced: <%= format_sync_time(@last_sync_at) %></span>
+                <%= if @discrepancy_count > 0 do %>
+                  <a href="/sync/discrepancies" class="text-orange-500 hover:text-orange-600 hover:underline">
+                    (<%= @discrepancy_count %> discrepancies)
+                  </a>
+                <% end %>
               </div>
             <% end %>
           </div>
@@ -508,11 +520,11 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                        phx-click="track_download"
                        phx-value-icon-id={@icon.id}
                        phx-value-size={size}
-                       class="mt-1 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       title="Download SVG"
+                       class="mt-1 p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
-                      Download
                     </a>
                   </div>
                 <% end %>
@@ -535,6 +547,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     phx-value-platform="ios"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
+                  <.platform_icon name="ios" class="w-4 h-4 text-gray-600" />
                   <span class="text-sm text-gray-600">iOS</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -545,6 +558,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     phx-value-platform="android"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
+                  <.platform_icon name="android" class="w-4 h-4 text-gray-600" />
                   <span class="text-sm text-gray-600">Android</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -555,6 +569,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     phx-value-platform="react"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
+                  <.platform_icon name="react" class="w-4 h-4 text-gray-600" />
                   <span class="text-sm text-gray-600">React</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -565,6 +580,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     phx-value-platform="svelte"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
+                  <.platform_icon name="svelte" class="w-4 h-4 text-gray-600" />
                   <span class="text-sm text-gray-600">Svelte</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -575,6 +591,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                     phx-value-platform="filename"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
+                  <.platform_icon name="filename" class="w-4 h-4 text-gray-600" />
                   <span class="text-sm text-gray-600">Filename</span>
                 </label>
               </div>
@@ -583,7 +600,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               <%= if @platform_prefs.ios do %>
                 <div class="bg-gray-50 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-600">iOS (Swift)</span>
+                    <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                      <.platform_icon name="ios" class="w-4 h-4" />
+                      iOS (Swift)
+                    </span>
                   </div>
                   <div class="space-y-1">
                     <%= for {size, id} <- @icon.ios_identifiers do %>
@@ -605,7 +625,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               <%= if @platform_prefs.android do %>
                 <div class="bg-gray-50 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-600">Android (Kotlin/Java)</span>
+                    <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                      <.platform_icon name="android" class="w-4 h-4" />
+                      Android (Kotlin/Java)
+                    </span>
                   </div>
                   <div class="space-y-1">
                     <%= for {size, id} <- @icon.android_identifiers do %>
@@ -627,7 +650,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               <%= if @platform_prefs.react do %>
                 <div class="bg-gray-50 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-600">React (@fluentui/react-icons)</span>
+                    <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                      <.platform_icon name="react" class="w-4 h-4" />
+                      React (@fluentui/react-icons)
+                    </span>
                   </div>
                   <div class="space-y-1">
                     <%= for size <- @icon.sizes do %>
@@ -651,7 +677,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                      data-style={@icon.style}
                      data-sizes={Jason.encode!(@icon.sizes)}>
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-600">Svelte (svelte-fluentui)</span>
+                    <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                      <.platform_icon name="svelte" class="w-4 h-4" />
+                      Svelte (svelte-fluentui)
+                    </span>
                     <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
                       <input type="checkbox" class="svelte-include-color w-3.5 h-3.5 rounded border-gray-300" />
                       Include color
@@ -677,7 +706,10 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                 <div class="bg-gray-50 rounded-lg p-4" id={"filename-section-#{@icon.id}"} phx-hook="FilenameTemplate"
                      data-name={@icon.name} data-style={@icon.style} data-sizes={Jason.encode!(@icon.sizes)}>
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm font-medium text-gray-600">Filename (local copy)</span>
+                    <span class="text-sm font-medium text-gray-600 flex items-center gap-1.5">
+                      <.platform_icon name="filename" class="w-4 h-4" />
+                      Filename (local copy)
+                    </span>
                   </div>
                   <div class="mb-1 text-xs text-gray-500">
                     <span class="font-medium">Placeholders:</span>
@@ -795,14 +827,26 @@ defmodule FluentuiIconsWeb.IconSearchLive do
             <% end %>
           </div>
 
-          <!-- Identifiers (shown on hover) -->
+          <!-- Identifiers (shown on hover) - shows first 2 preferred platforms -->
           <div class="mt-3 opacity-0 group-hover:opacity-100 transition-opacity space-y-1 text-xs">
-            <div class="bg-gray-50 rounded px-2 py-1 truncate" title={get_ios_id(icon)}>
-              iOS: <code class="text-blue-600"><%= get_ios_id(icon) %></code>
-            </div>
-            <div class="bg-gray-50 rounded px-2 py-1 truncate" title={get_android_id(icon)}>
-              Android: <code class="text-green-600"><%= get_android_id(icon) %></code>
-            </div>
+            <%= for platform <- preferred_platforms(@platform_prefs, 2) do %>
+              <div class="bg-gray-50 rounded px-2 py-1 flex items-center gap-1 group/copy">
+                <.platform_icon name={to_string(platform)} class="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                <span class="truncate flex-1" title={get_platform_id(icon, platform)}>
+                  <code class={platform_color(platform)}><%= get_platform_id(icon, platform) %></code>
+                </span>
+                <button
+                  type="button"
+                  phx-click={JS.dispatch("phx:copy_text", detail: %{text: get_platform_id(icon, platform), icon_id: icon.id, platform: platform})}
+                  class="opacity-0 group-hover/copy:opacity-100 text-gray-400 hover:text-gray-600 p-0.5"
+                  title="Copy"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+            <% end %>
           </div>
         </div>
       <% end %>
@@ -830,7 +874,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
               <tr
                 phx-click="select_icon"
                 phx-value-id={icon.id}
-                class="hover:bg-blue-50 cursor-pointer transition-colors"
+                class="hover:bg-blue-50 cursor-pointer transition-colors group"
               >
                 <td class="px-4 py-3">
                   <span class="inline-svg-icon inline-flex items-center justify-center w-6 h-6" data-svg-url={Icon.svg_url(icon, default_size(icon.sizes))}></span>
@@ -840,9 +884,24 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                   <span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600 capitalize"><%= icon.style %></span>
                 </td>
                 <%= for size <- [16, 20, 24, 28, 32, 48] do %>
-                  <td class="px-2 py-3 text-center">
+                  <td class="px-2 py-3 text-center relative">
                     <%= if size in icon.sizes do %>
                       <span class="text-green-600 font-black text-lg">✓</span>
+                      <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50">
+                        <div class="flex gap-0.5">
+                          <%= for platform <- preferred_platforms(@platform_prefs, 2) do %>
+                            <button
+                              type="button"
+                              phx-click={JS.dispatch("phx:copy_text", detail: %{text: get_platform_id_for_size(icon, platform, size), icon_id: icon.id, platform: platform})}
+                              class={"p-1.5 rounded hover:bg-blue-200 #{platform_color(platform)}"}
+                              title={"Copy #{platform} identifier for size #{size}"}
+                              onclick="event.stopPropagation();"
+                            >
+                              <.platform_icon name={to_string(platform)} class="w-4 h-4" />
+                            </button>
+                          <% end %>
+                        </div>
+                      </div>
                     <% else %>
                       <span class="text-gray-300">✗</span>
                     <% end %>
@@ -870,6 +929,39 @@ defmodule FluentuiIconsWeb.IconSearchLive do
     size = default_size(icon.sizes) |> to_string()
     Map.get(icon.android_identifiers, size, "N/A")
   end
+
+  # Get the first N enabled platforms from user preferences
+  defp preferred_platforms(prefs, count) do
+    [:ios, :android, :react, :svelte, :filename]
+    |> Enum.filter(&Map.get(prefs, &1, false))
+    |> Enum.take(count)
+  end
+
+  defp platform_color(:ios), do: "text-blue-600"
+  defp platform_color(:android), do: "text-green-600"
+  defp platform_color(:react), do: "text-cyan-600"
+  defp platform_color(:svelte), do: "text-orange-600"
+  defp platform_color(:filename), do: "text-gray-600"
+  defp platform_color(_), do: "text-gray-600"
+
+  defp get_platform_id(icon, :ios), do: get_ios_id(icon)
+  defp get_platform_id(icon, :android), do: get_android_id(icon)
+  defp get_platform_id(icon, :react), do: react_identifier(icon, default_size(icon.sizes))
+  defp get_platform_id(icon, :svelte), do: svelte_identifier(icon, default_size(icon.sizes))
+  defp get_platform_id(icon, :filename), do: Icon.svg_filename(icon, default_size(icon.sizes))
+  defp get_platform_id(_, _), do: "N/A"
+
+  # Get platform identifier for a specific size
+  defp get_platform_id_for_size(icon, :ios, size) do
+    Map.get(icon.ios_identifiers, to_string(size), "N/A")
+  end
+  defp get_platform_id_for_size(icon, :android, size) do
+    Map.get(icon.android_identifiers, to_string(size), "N/A")
+  end
+  defp get_platform_id_for_size(icon, :react, size), do: react_identifier(icon, size)
+  defp get_platform_id_for_size(icon, :svelte, size), do: svelte_identifier(icon, size)
+  defp get_platform_id_for_size(icon, :filename, size), do: Icon.svg_filename(icon, size)
+  defp get_platform_id_for_size(_, _, _), do: "N/A"
 
   # React: PascalCase component import (e.g., <ArrowClockwise24Regular />)
   defp react_identifier(icon, size) do

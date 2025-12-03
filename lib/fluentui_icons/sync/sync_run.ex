@@ -13,6 +13,8 @@ defmodule FluentuiIcons.Sync.SyncRun do
     field :icons_synced, :integer
     field :svgs_downloaded, :integer
     field :error_message, :string
+    field :discrepancies, {:array, :map}, default: []
+    field :discrepancy_count, :integer, default: 0
     field :started_at, :utc_datetime
     field :completed_at, :utc_datetime
 
@@ -22,7 +24,7 @@ defmodule FluentuiIcons.Sync.SyncRun do
   @doc false
   def changeset(sync_run, attrs) do
     sync_run
-    |> cast(attrs, [:job_type, :status, :icons_synced, :svgs_downloaded, :error_message, :started_at, :completed_at])
+    |> cast(attrs, [:job_type, :status, :icons_synced, :svgs_downloaded, :error_message, :discrepancies, :discrepancy_count, :started_at, :completed_at])
     |> validate_required([:job_type, :status, :started_at])
     |> validate_inclusion(:status, ~w(running completed failed))
     |> validate_inclusion(:job_type, ~w(icon_sync svg_download full_sync))

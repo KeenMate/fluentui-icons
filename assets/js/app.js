@@ -35,6 +35,18 @@ const platformPrefs = savedPlatformPrefs
 // Filename template helpers
 const DEFAULT_FILENAME_TEMPLATE = "{filename}"
 
+// Helper to push events to LiveView - uses a tracker hook element
+function pushLiveEvent(event, params) {
+  const tracker = document.getElementById('metrics-tracker')
+  if (tracker && tracker._pushEvent) {
+    console.log('pushLiveEvent:', event, params)
+    tracker._pushEvent(event, params)
+    return true
+  }
+  console.warn('pushLiveEvent: tracker not ready')
+  return false
+}
+
 function toSnakeCase(name) {
   return name.toLowerCase().replace(/\s+/g, '_')
 }
@@ -116,11 +128,8 @@ Hooks.FilenameTemplate = {
           const modal = document.querySelector('[role="dialog"]')
           const downloadLink = modal?.querySelector('a[phx-click="track_download"]')
           const iconId = downloadLink?.getAttribute('phx-value-icon-id')
-          if (iconId && window.liveSocket?.main) {
-            window.liveSocket.main.pushEvent("track_copy", {
-              "icon-id": iconId,
-              platform: "filename"
-            })
+          if (iconId) {
+            pushLiveEvent("track_copy", { "icon-id": iconId, platform: "filename" })
           }
         })
       }
@@ -259,11 +268,13 @@ Hooks.IconColorFilter = {
   },
 
   updated() {
+    // First, recolor any icons that are already loaded
+    this.updateAllColors()
+    // Then load any new icons that don't have SVGs yet
     this.loadAllSvgs()
   },
 
   async loadAllSvgs() {
-    const color = localStorage.getItem('icon_preview_color') || '#212121'
     const icons = this.el.querySelectorAll('.inline-svg-icon')
 
     // Use IntersectionObserver for lazy loading
@@ -271,7 +282,7 @@ Hooks.IconColorFilter = {
       this.observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            this.loadSvg(entry.target, color)
+            this.loadSvg(entry.target)
             this.observer.unobserve(entry.target)
           }
         })
@@ -279,13 +290,18 @@ Hooks.IconColorFilter = {
     }
 
     icons.forEach(icon => {
-      if (!icon.dataset.loaded) {
+      // Check if icon actually has SVG content, not just data-loaded flag
+      const hasSvg = icon.querySelector('svg')
+      if (!hasSvg) {
+        delete icon.dataset.loaded
         this.observer.observe(icon)
       }
     })
   },
 
-  async loadSvg(container, color) {
+  async loadSvg(container) {
+    // Always read fresh color from localStorage
+    const color = localStorage.getItem('icon_preview_color') || '#212121'
     const url = container.dataset.svgUrl
     if (!url) return
 
@@ -329,6 +345,16 @@ Hooks.IconColorFilter = {
         }
       })
     })
+  }
+}
+
+// Metrics tracker hook - provides a way to push events from any JS code
+Hooks.MetricsTracker = {
+  mounted() {
+    // Expose pushEvent function on the element so other JS can use it
+    this.el._pushEvent = (event, params) => {
+      this.pushEvent(event, params)
+    }
   }
 }
 
@@ -402,6 +428,28 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Direct copy to clipboard handler (text passed in event detail)
+window.addEventListener("phx:copy_text", (event) => {
+  const { text, icon_id, platform } = event.detail
+  if (text) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Show brief feedback on the button
+      const button = event.target
+      if (button) {
+        const svg = button.querySelector('svg')
+        if (svg) {
+          svg.style.color = '#22c55e'
+          setTimeout(() => svg.style.color = '', 1000)
+        }
+      }
+      // Track the copy
+      if (icon_id && platform) {
+        pushLiveEvent("track_copy", { "icon-id": String(icon_id), platform: String(platform) })
+      }
+    }).catch(err => console.error('Failed to copy:', err))
+  }
+})
+
 // Copy to clipboard handler
 window.addEventListener("phx:copy", (event) => {
   // The dispatcher is the button that was clicked
@@ -466,11 +514,8 @@ function trackCopy(targetEl) {
   }
 
   // Push event to LiveView
-  const liveSocket = window.liveSocket
-  if (liveSocket && liveSocket.main) {
-    const params = { "icon-id": iconId, platform: platform }
-    if (size) params.size = size
-    liveSocket.main.pushEvent("track_copy", params)
-  }
+  const params = { "icon-id": iconId, platform: platform }
+  if (size) params.size = size
+  pushLiveEvent("track_copy", params)
 }
 

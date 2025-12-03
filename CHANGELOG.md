@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- Platform icons: SVG icons for iOS (Apple), Android, React, Svelte, and Filename displayed throughout the UI
+  - Platform toggle checkboxes in modal show platform icons
+  - Platform identifier section headers include platform icons
+  - Grid hover shows platform icons instead of text labels
+  - List view shows platform copy buttons on row hover (overlay with icons for first 2 preferred platforms)
+- Preferred platform ordering: Grid/list hover shows first 2 platforms based on user's modal selection order
+- Platform usage tracking: Track which platforms users copy most frequently
+- `mix icons.clean` task: Clean icons/synonyms from database for fresh reload (options: `--all`, `--files`, `--yes`)
+- `mix icons.cube` task: Refresh pre-aggregated metrics cube (7d, 30d, all-time)
+- ZIP-based sync: Use ZIP archive as single source of truth (eliminates version mismatch between markdown and ZIP)
+- Discrepancy detection: Cross-reference metadata.json claims with actual SVG files
+  - Track missing SVG files during sync
+  - Discrepancy report page at `/sync/discrepancies`
+  - Footer link shows discrepancy count when > 0
+
 ### Fixed
+- Fix copy tracking not sending events to server (MetricsTracker hook pattern)
+- Fix color picker persistence when changing filters or closing modal
 - Fix icon size parsing for numbered icons (e.g., "Music Note 1", "Calendar 3 Day") - was extracting `120` instead of `20` from iOS identifiers like `musicNote120Filled`
 - Fix orphaned SVG files remaining on disk after sync - now cleans up style directories before extracting new icons
 - Fix Tailwind CSS classes missing in production Docker build by reordering Dockerfile to copy `lib/` before `mix assets.deploy`

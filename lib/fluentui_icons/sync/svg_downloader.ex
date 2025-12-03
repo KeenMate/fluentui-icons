@@ -1,33 +1,40 @@
 defmodule FluentuiIcons.Sync.SvgDownloader do
   @moduledoc """
   Downloads SVG files from GitHub to local storage for self-hosting.
+
+  This is the single source of truth for icon syncing - it downloads the ZIP,
+  parses icon metadata, extracts SVGs, and returns all data for database insertion.
   """
 
   require Logger
   alias FluentuiIcons.{Repo, Icons.Icon}
-  alias FluentuiIcons.Sync.MetaphorExtractor
+  alias FluentuiIcons.Sync.ZipParser
 
   @github_zip_url "https://github.com/microsoft/fluentui-system-icons/archive/refs/heads/main.zip"
   @valid_styles ~w(regular filled color light)
 
   @doc """
-  Download all SVGs by fetching the GitHub repo ZIP (recommended).
-  Much faster than individual downloads - one ~200MB download instead of 19k+ requests.
-  """
-  def download_from_zip do
-    dir = output_dir()
-    Logger.info("Downloading FluentUI icons ZIP to #{dir}...")
+  Download ZIP, parse icons, extract SVGs, and return all data.
 
-    # Create temp file for ZIP
+  This is the unified sync entry point that ensures consistency between
+  the icon database and SVG files by using a single ZIP download.
+
+  Returns:
+    {:ok, %{icons: [icon_maps], metaphors: %{name => [metaphors]}, svg_count: integer}}
+    {:error, reason}
+  """
+  def download_and_parse do
+    dir = output_dir()
+    Logger.info("Starting unified sync from GitHub ZIP to #{dir}...")
+
     temp_zip = Path.join(System.tmp_dir!(), "fluentui-icons-#{:os.system_time(:millisecond)}.zip")
 
     try do
-      # Download ZIP
       Logger.info("Fetching ZIP from GitHub (this may take a minute)...")
       case Req.get(@github_zip_url, receive_timeout: 300_000, into: File.stream!(temp_zip)) do
         {:ok, %{status: 200}} ->
-          Logger.info("ZIP downloaded, extracting SVGs...")
-          extract_svgs_from_zip(temp_zip, dir)
+          Logger.info("ZIP downloaded, processing...")
+          process_zip(temp_zip, dir)
 
         {:ok, %{status: status}} ->
           {:error, "Failed to download ZIP: HTTP #{status}"}
@@ -36,17 +43,26 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
           {:error, "Failed to download ZIP: #{inspect(reason)}"}
       end
     after
-      # Cleanup temp file
       File.rm(temp_zip)
     end
   end
 
-  defp extract_svgs_from_zip(zip_path, output_dir) do
+  @doc """
+  Legacy function - now calls download_and_parse internally.
+  Kept for backwards compatibility.
+  """
+  def download_from_zip do
+    case download_and_parse() do
+      {:ok, %{svg_count: count}} -> {:ok, count}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp process_zip(zip_path, output_dir) do
     # Clean up existing icons to remove orphaned files
     Logger.info("Cleaning up existing icons in #{output_dir}...")
     for style <- @valid_styles do
       style_dir = Path.join(output_dir, style)
-      # Remove and recreate to ensure clean state
       File.rm_rf(style_dir)
       File.mkdir_p!(style_dir)
     end
@@ -56,41 +72,42 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
     File.mkdir_p!(temp_dir)
 
     try do
-      # Prefer 7zip > unzip > Erlang (7zip is fastest and most reliable on Windows)
-      result = case find_7zip() do
+      # Extract ZIP using best available tool
+      extract_result = case find_7zip() do
         {:ok, path} ->
           Logger.info("Using 7zip (fastest)...")
-          extract_with_7zip(path, zip_path, temp_dir, output_dir)
+          extract_with_7zip_only(path, zip_path, temp_dir)
 
         :not_found ->
           case System.find_executable("unzip") do
             nil ->
               Logger.info("Using Erlang :zip (slower). Install '7z' or 'unzip' for faster extraction.")
-              extract_with_erlang_zip(zip_path, temp_dir, output_dir)
+              extract_with_erlang_zip_only(zip_path, temp_dir)
 
             _unzip ->
               Logger.info("Using system unzip...")
-              extract_with_system_unzip(zip_path, temp_dir, output_dir)
+              extract_with_system_unzip_only(zip_path, temp_dir)
           end
       end
 
-      # Extract metaphors from metadata.json files before cleanup
-      case result do
-        {:ok, _count} ->
-          Logger.info("Extracting metaphors from metadata.json files...")
-          case MetaphorExtractor.extract_from_directory(temp_dir) do
-            {:ok, metaphors} when map_size(metaphors) > 0 ->
-              MetaphorExtractor.seed_metaphors(metaphors)
-            _ ->
-              :ok
-          end
-        _ ->
-          :ok
-      end
+      case extract_result do
+        :ok ->
+          # Parse icons BEFORE moving SVGs (metadata.json has all info we need)
+          Logger.info("Parsing icon metadata from extracted files...")
+          case ZipParser.parse_from_directory(temp_dir) do
+            {:ok, %{icons: icons, metaphors: metaphors, discrepancies: discrepancies}} ->
+              # Now move SVGs to output directory
+              {:ok, svg_count} = move_svgs_to_output(temp_dir, output_dir)
+              {:ok, %{icons: icons, metaphors: metaphors, svg_count: svg_count, discrepancies: discrepancies}}
 
-      result
+            {:error, reason} ->
+              {:error, "Failed to parse icons: #{reason}"}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     after
-      # Cleanup temp directory
       File.rm_rf(temp_dir)
     end
   end
@@ -132,10 +149,10 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
     end
   end
 
-  defp extract_with_7zip(exe_path, zip_path, temp_dir, output_dir) do
+  defp extract_with_7zip_only(exe_path, zip_path, temp_dir) do
     # 7zip: x = extract with paths, -o = output dir (no space!), -y = yes to all
     # Only extract assets folder (contains SVGs and metadata.json files)
-    Logger.info("Running 7zip: #{exe_path} x #{zip_path} -o#{temp_dir} assets/* -y")
+    Logger.info("Running 7zip: #{exe_path} x #{zip_path} -o#{temp_dir} fluentui-system-icons-main/assets/* -y")
     {output, exit_code} = System.cmd(exe_path, [
       "x",
       zip_path,
@@ -150,35 +167,12 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
     if exit_code != 0 do
       {:error, "7zip failed (exit #{exit_code}): #{output}"}
     else
-      # Debug: list directory structure
-      case File.ls(temp_dir) do
-        {:ok, contents} ->
-          Logger.info("Temp dir contents (#{length(contents)} items): #{Enum.take(contents, 5) |> inspect}")
-          # List nested assets folder if it exists
-          repo_dir = Path.join(temp_dir, "fluentui-system-icons-main")
-          if File.dir?(repo_dir) do
-            case File.ls(repo_dir) do
-              {:ok, repo_contents} ->
-                Logger.info("Repo dir contents: #{Enum.take(repo_contents, 10) |> inspect}")
-                assets_dir = Path.join(repo_dir, "assets")
-                if File.dir?(assets_dir) do
-                  case File.ls(assets_dir) do
-                    {:ok, asset_contents} ->
-                      Logger.info("Assets dir has #{length(asset_contents)} items, first 5: #{Enum.take(asset_contents, 5) |> inspect}")
-                    _ -> :ok
-                  end
-                end
-              _ -> :ok
-            end
-          end
-        {:error, reason} ->
-          Logger.warning("Could not list temp dir: #{inspect(reason)}")
-      end
-      move_svgs_to_output(temp_dir, output_dir)
+      log_extraction_structure(temp_dir)
+      :ok
     end
   end
 
-  defp extract_with_system_unzip(zip_path, temp_dir, output_dir) do
+  defp extract_with_system_unzip_only(zip_path, temp_dir) do
     # Extract only assets folder (contains SVGs and metadata.json files)
     {output, exit_code} = System.cmd("unzip", [
       "-q",           # quiet
@@ -191,11 +185,12 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
     if exit_code != 0 do
       {:error, "unzip failed (exit #{exit_code}): #{output}"}
     else
-      move_svgs_to_output(temp_dir, output_dir)
+      log_extraction_structure(temp_dir)
+      :ok
     end
   end
 
-  defp extract_with_erlang_zip(zip_path, temp_dir, output_dir) do
+  defp extract_with_erlang_zip_only(zip_path, temp_dir) do
     # Erlang :zip.unzip extracts all at once (faster than file-by-file)
     Logger.info("Extracting ZIP to temp directory...")
 
@@ -203,11 +198,37 @@ defmodule FluentuiIcons.Sync.SvgDownloader do
       {:cwd, String.to_charlist(temp_dir)}
     ]) do
       {:ok, _files} ->
-        Logger.info("ZIP extracted, moving SVG files...")
-        move_svgs_to_output(temp_dir, output_dir)
+        Logger.info("ZIP extracted")
+        log_extraction_structure(temp_dir)
+        :ok
 
       {:error, reason} ->
         {:error, "Erlang unzip failed: #{inspect(reason)}"}
+    end
+  end
+
+  defp log_extraction_structure(temp_dir) do
+    case File.ls(temp_dir) do
+      {:ok, contents} ->
+        Logger.info("Temp dir contents (#{length(contents)} items): #{Enum.take(contents, 5) |> inspect}")
+        repo_dir = Path.join(temp_dir, "fluentui-system-icons-main")
+        if File.dir?(repo_dir) do
+          case File.ls(repo_dir) do
+            {:ok, repo_contents} ->
+              Logger.info("Repo dir contents: #{Enum.take(repo_contents, 10) |> inspect}")
+              assets_dir = Path.join(repo_dir, "assets")
+              if File.dir?(assets_dir) do
+                case File.ls(assets_dir) do
+                  {:ok, asset_contents} ->
+                    Logger.info("Assets dir has #{length(asset_contents)} items, first 5: #{Enum.take(asset_contents, 5) |> inspect}")
+                  _ -> :ok
+                end
+              end
+            _ -> :ok
+          end
+        end
+      {:error, reason} ->
+        Logger.warning("Could not list temp dir: #{inspect(reason)}")
     end
   end
 
