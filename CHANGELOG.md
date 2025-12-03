@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Sticky headers: Table headers and search/filter controls now stay fixed at the top when scrolling
+  - Table headers (`<thead>`) stick in both icon list and sync discrepancies views
+  - Search bar, filters, and view toggle stick together as a unified header section
 - Platform icons: SVG icons for iOS (Apple), Android, React, Svelte, and Filename displayed throughout the UI
   - Platform toggle checkboxes in modal show platform icons
   - Platform identifier section headers include platform icons

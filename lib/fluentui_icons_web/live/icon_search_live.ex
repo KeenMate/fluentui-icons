@@ -245,6 +245,8 @@ defmodule FluentuiIconsWeb.IconSearchLive do
           <p class="text-gray-600 mt-1">Search <%= @icon_count %> icons from Microsoft's FluentUI System Icons</p>
         </div>
 
+        <!-- Sticky Header Section -->
+        <div class="sticky top-0 z-20 bg-gray-50 pt-4 pb-4 -mx-4 px-4">
         <!-- Search Bar -->
         <form phx-change="search" phx-submit="search" class="mb-6">
           <div class="relative">
@@ -372,6 +374,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
             </div>
             <.pager current_page={@page} total_pages={@total_pages} />
           </div>
+        </div>
         </div>
 
         <!-- Icon Display (Grid or List) - Both rendered, CSS controls visibility -->
@@ -859,7 +862,7 @@ defmodule FluentuiIconsWeb.IconSearchLive do
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-gray-100 border-b-2 border-gray-300">
+          <thead class="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-10">
             <tr>
               <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base">Icon</th>
               <th class="px-4 py-4 text-left font-semibold text-gray-700 text-base">Name</th>
