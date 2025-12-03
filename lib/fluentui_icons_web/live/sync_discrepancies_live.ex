@@ -86,7 +86,7 @@ defmodule FluentuiIconsWeb.SyncDiscrepanciesLive do
                         </td>
                         <td class="px-4 py-3">
                           <div class="flex flex-wrap gap-2">
-                            <%= for issue <- issues do %>
+                            <%= for issue <- sort_issues(issues) do %>
                               <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
                                 <%= issue["style"] %>/<%= issue["size"] %>px
                               </span>
@@ -127,5 +127,15 @@ defmodule FluentuiIconsWeb.SyncDiscrepanciesLive do
     |> Enum.group_by(& &1["style"])
     |> Enum.map(fn {style, items} -> {style, length(items)} end)
     |> Enum.sort_by(fn {_, count} -> -count end)
+  end
+
+  @style_order %{"regular" => 0, "filled" => 1, "color" => 2, "light" => 3}
+
+  defp sort_issues(issues) do
+    Enum.sort_by(issues, fn issue ->
+      style_priority = Map.get(@style_order, issue["style"], 99)
+      size = issue["size"] || 0
+      {style_priority, size}
+    end)
   end
 end
