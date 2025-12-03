@@ -17,10 +17,17 @@
   - Track missing SVG files during sync
   - Discrepancy report page at `/sync/discrepancies`
   - Footer link shows discrepancy count when > 0
+- Maintenance API endpoint (`POST /api/maintenance/:task`) for remote task execution
+  - Tasks: `sync`, `clean`, `cube`
+  - API key authentication via `X-API-Key` header (set `MAINTENANCE_API_KEY` env var)
+  - Rate limiting with Hammer (5 attempts per 5 minutes per IP)
+  - Timing-safe key comparison to prevent timing attacks
 
 ### Fixed
 - Fix copy tracking not sending events to server (MetricsTracker hook pattern)
 - Fix color picker persistence when changing filters or closing modal
+- Fix SVG files not copying to mounted Docker volume (use `File.copy` instead of `File.rename` for cross-filesystem support)
+- Fix list view copy buttons not working (event propagation conflict with row click)
 - Fix icon size parsing for numbered icons (e.g., "Music Note 1", "Calendar 3 Day") - was extracting `120` instead of `20` from iOS identifiers like `musicNote120Filled`
 - Fix orphaned SVG files remaining on disk after sync - now cleans up style directories before extracting new icons
 - Fix Tailwind CSS classes missing in production Docker build by reordering Dockerfile to copy `lib/` before `mix assets.deploy`

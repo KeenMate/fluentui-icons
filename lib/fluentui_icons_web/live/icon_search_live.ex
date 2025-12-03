@@ -892,10 +892,12 @@ defmodule FluentuiIconsWeb.IconSearchLive do
                           <%= for platform <- preferred_platforms(@platform_prefs, 2) do %>
                             <button
                               type="button"
-                              phx-click={JS.dispatch("phx:copy_text", detail: %{text: get_platform_id_for_size(icon, platform, size), icon_id: icon.id, platform: platform})}
                               class={"p-1.5 rounded hover:bg-blue-200 #{platform_color(platform)}"}
                               title={"Copy #{platform} identifier for size #{size}"}
-                              onclick="event.stopPropagation();"
+                              data-copy-text={get_platform_id_for_size(icon, platform, size)}
+                              data-icon-id={icon.id}
+                              data-platform={platform}
+                              onclick="event.stopPropagation(); window.copyFromButton(this);"
                             >
                               <.platform_icon name={to_string(platform)} class="w-4 h-4" />
                             </button>

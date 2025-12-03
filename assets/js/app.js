@@ -479,6 +479,28 @@ window.addEventListener("phx:copy", (event) => {
   }
 })
 
+// Copy from button (used in list view where we need to stop propagation)
+window.copyFromButton = function(button) {
+  const text = button.dataset.copyText
+  const iconId = button.dataset.iconId
+  const platform = button.dataset.platform
+
+  if (text) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Show brief feedback
+      const svg = button.querySelector('svg')
+      if (svg) {
+        svg.style.color = '#22c55e'
+        setTimeout(() => svg.style.color = '', 1000)
+      }
+      // Track the copy
+      if (iconId && platform) {
+        pushLiveEvent("track_copy", { "icon-id": String(iconId), platform: String(platform) })
+      }
+    }).catch(err => console.error('Failed to copy:', err))
+  }
+}
+
 // Track copy actions for metrics
 function trackCopy(targetEl) {
   // Find the modal to get icon ID
