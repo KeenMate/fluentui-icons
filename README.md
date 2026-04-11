@@ -1,27 +1,26 @@
-# FluentUI Icon Search
+ > **⚠️ This project has been replaced by [icons.pureadmin.io](https://icons.pureadmin.io)** — a multi-icon-set search application supporting FluentUI, Lucide, Tabler,
+  Heroicons, Font Awesome, and more.
+
+  A fast, searchable database of 6000+ Microsoft FluentUI System Icons with platform-specific identifiers for iOS, Android, React, and Svelte.
+
+# FluentUI Icon Search => [icons.pureadmin.io](https://icons.pureadmin.io)
 
 A fast, searchable database of 6000+ Microsoft FluentUI System Icons with platform-specific identifiers for iOS, Android, React, and Svelte.
-
-**Live:** [fluentui-icons.keenmate.dev](https://fluentui-icons.keenmate.dev)
-
 ## MCP Server for Claude
-
 Search FluentUI icons directly from Claude Desktop, Claude Code, or any MCP client:
 
-```bash
-npx @keenmate/fluentui-icons-mcp
-```
+  ```bash
+  npx @keenmate/fluentui-icons-mcp
 
-Add to your Claude config:
-```json
-{
-  "mcpServers": {
-    "fluentui-icons": {
-      "command": "npx",
-      "args": ["-y", "@keenmate/fluentui-icons-mcp"]
+  Add to your Claude config:
+  {
+    "mcpServers": {
+      "fluentui-icons": {
+        "command": "npx",
+        "args": ["-y", "@keenmate/fluentui-icons-mcp"]
+      }
     }
   }
-}
 ```
 
 See [@keenmate/fluentui-icons-mcp](https://www.npmjs.com/package/@keenmate/fluentui-icons-mcp) on npm.
